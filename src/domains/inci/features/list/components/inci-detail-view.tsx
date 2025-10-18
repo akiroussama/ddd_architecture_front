@@ -10,7 +10,7 @@ import { toast } from "sonner"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 
-import type { InciEntry } from "@/types"
+import type { InciEntry } from "@/shared/types"
 
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"

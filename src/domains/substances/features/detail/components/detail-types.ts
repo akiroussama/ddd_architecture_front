@@ -1,6 +1,6 @@
 "use client"
 
-import type { Restriction } from "@/types"
+import type { Restriction } from "@/shared/types"
 import type { ScenarioStatus } from "./detail-constants"
 
 export interface ComplianceSnapshot {

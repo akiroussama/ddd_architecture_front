@@ -11,7 +11,7 @@ import {
   Percent,
   ShieldAlert
 } from "lucide-react"
-import type { Restriction } from "@/types"
+import type { Restriction } from "@/shared/types"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import {

@@ -27,7 +27,7 @@ import {
   type SortingState
 } from "@tanstack/react-table"
 
-import type { InciEntry } from "@/types"
+import type { InciEntry } from "@/shared/types"
 
 import { toast } from "sonner"
 

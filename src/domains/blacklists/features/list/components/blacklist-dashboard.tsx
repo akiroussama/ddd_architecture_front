@@ -13,7 +13,7 @@ import {
   ListChecks,
   Sparkles
 } from "lucide-react"
-import type { Blacklist, Substance } from "@/types"
+import type { Blacklist, Substance } from "@/shared/types"
 
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"

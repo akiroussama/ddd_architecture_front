@@ -1,4 +1,4 @@
-import { Blacklist, InciEntry, Restriction, Substance } from "@/types"
+import { Blacklist, InciEntry, Restriction, Substance } from "@/shared/types"
 
 export const substanceClasses = [
   "Base",

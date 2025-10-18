@@ -56,7 +56,7 @@ import {
   mockInciNames,
   generateMockRawMaterials,
 } from "@/shared/lib/raw-materials-mock-data"
-import type { RawMaterial, RawMaterialStatus, RawMaterialFilters } from "@/types"
+import type { RawMaterial, RawMaterialStatus, RawMaterialFilters } from "@/shared/types"
 
 // Status configuration with colors
 const statusConfig: Record<

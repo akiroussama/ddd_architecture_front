@@ -15,7 +15,7 @@ import {
 } from "lucide-react"
 import type { PaginationState, RowSelectionState, SortingState } from "@tanstack/react-table"
 
-import type { RestrictionType, Substance, SubstanceStatus } from "@/types"
+import type { RestrictionType, Substance, SubstanceStatus } from "@/shared/types"
 
 import { toast } from "sonner"
 

@@ -5,7 +5,7 @@ import Link from "next/link"
 import { ArrowLeft, ClipboardCopy, Edit, FileText, Package, Shield, AlertCircle, Beaker } from "lucide-react"
 import { toast } from "sonner"
 
-import type { Blacklist, Restriction, Substance } from "@/types"
+import type { Blacklist, Restriction, Substance } from "@/shared/types"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card"

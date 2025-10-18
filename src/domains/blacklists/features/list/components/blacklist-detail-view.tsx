@@ -8,7 +8,7 @@ import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { toast } from "sonner"
 
-import type { Blacklist, Substance } from "@/types"
+import type { Blacklist, Substance } from "@/shared/types"
 
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"

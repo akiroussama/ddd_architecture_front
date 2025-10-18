@@ -64,7 +64,7 @@ import {
   mockSites,
   mockInciNames,
 } from "@/shared/lib/raw-materials-mock-data"
-import type { RawMaterial, RawMaterialStatus } from "@/types"
+import type { RawMaterial, RawMaterialStatus } from "@/shared/types"
 
 // Status configuration (same as list)
 const statusConfig: Record<

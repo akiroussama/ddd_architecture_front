@@ -17,7 +17,7 @@ import {
 import { ChevronDown, ExternalLink, MoreHorizontal } from "lucide-react"
 
 import { formatDate, formatRelativeDate } from "@/shared/lib/utils"
-import type { Substance } from "@/types"
+import type { Substance } from "@/shared/types"
 
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"

@@ -9,7 +9,7 @@ import {
   GaugeCircle,
   ListChecks
 } from "lucide-react"
-import type { Blacklist, Document, RegulatoryNote, Substance } from "@/types"
+import type { Blacklist, Document, RegulatoryNote, Substance } from "@/shared/types"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import {

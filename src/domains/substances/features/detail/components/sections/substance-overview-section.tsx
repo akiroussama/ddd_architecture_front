@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useMemo } from "react"
 import { AlertTriangle, ArrowLeft, ClipboardCopy, FileText, GaugeCircle, ShieldAlert, Sparkles, Target } from "lucide-react"
-import type { Document, Substance } from "@/types"
+import type { Document, Substance } from "@/shared/types"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import {

@@ -13,7 +13,7 @@ import {
   Sparkles,
   Target
 } from "lucide-react"
-import type { Substance } from "@/types"
+import type { Substance } from "@/shared/types"
 
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"

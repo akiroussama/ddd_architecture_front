@@ -20,7 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
 import { toast } from "sonner"
 import { AlertTriangle, Ban, Download, Globe2, Layers, Sparkles, Star, CheckCircle } from "lucide-react"
-import type { Substance } from "@/types"
+import type { Substance } from "@/shared/types"
 
 import { cn, formatDate } from "@/shared/lib/utils"
 import { costComparisonLabel, formatCurrency } from "../detail-utils"

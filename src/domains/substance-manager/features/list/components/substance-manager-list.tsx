@@ -13,7 +13,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import type { Substance, SubstanceStatus } from "@/types"
+import type { Substance, SubstanceStatus } from "@/shared/types"
 import { Button } from "@/shared/ui/button"
 import { Input } from "@/shared/ui/input"
 import { Badge } from "@/shared/ui/badge"

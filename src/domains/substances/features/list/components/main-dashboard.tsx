@@ -27,7 +27,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import type { RestrictionType, Substance } from "@/types"
+import type { RestrictionType, Substance } from "@/shared/types"
 
 import { getRegulatoryTimeline, type RegulatoryTimelineEvent } from "@/shared/lib/mock-data"
 

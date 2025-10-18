@@ -15,7 +15,7 @@ import {
   type LucideIcon
 } from "lucide-react"
 
-import type { Blacklist, Restriction, Substance } from "@/types"
+import type { Blacklist, Restriction, Substance } from "@/shared/types"
 import type { RegulatoryTimelineEvent } from "@/shared/lib/mock-data"
 
 export const statusThemes: Record<

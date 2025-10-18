@@ -34,7 +34,7 @@ import { Badge } from "@/shared/ui/badge"
 import { Separator } from "@/shared/ui/separator"
 import { cn } from "@/shared/lib/utils"
 import { formatRelativeDate } from "@/shared/lib/utils"
-import type { InciAlias, CasEinecsPair, RegulatoryNote } from "@/types"
+import type { InciAlias, CasEinecsPair, RegulatoryNote } from "@/shared/types"
 
 // Validation Schemas
 const casPattern = /^(\d{2,7}-\d{2}-\d|Not Available)$/

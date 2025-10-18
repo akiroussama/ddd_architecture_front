@@ -4,7 +4,7 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Edit, FileText, AlertCircle } from "lucide-react"
 
-import type { Substance, Restriction, Blacklist } from "@/types"
+import type { Substance, Restriction, Blacklist } from "@/shared/types"
 import { Button } from "@/shared/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/shared/ui/card"
 import { Badge } from "@/shared/ui/badge"

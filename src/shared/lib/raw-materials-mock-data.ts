@@ -1,4 +1,4 @@
-import type { Site, Company, RawMaterial, RawMaterialStatus, RegulatoryNote, NoteAttachment } from "@/types"
+import type { Site, Company, RawMaterial, RawMaterialStatus, RegulatoryNote, NoteAttachment } from "@/shared/types"
 
 // Sites with specific code patterns
 export const mockSites: Site[] = [

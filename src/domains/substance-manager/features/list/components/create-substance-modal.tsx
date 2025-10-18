@@ -40,7 +40,7 @@ import { Badge } from "@/shared/ui/badge"
 import { Separator } from "@/shared/ui/separator"
 import { ScrollArea } from "@/shared/ui/scroll-area"
 import { cn, formatRelativeDate } from "@/shared/lib/utils"
-import type { InciAlias, CasEinecsPair } from "@/types"
+import type { InciAlias, CasEinecsPair } from "@/shared/types"
 
 // Validation Schemas
 const casPattern = /^(\d{2,7}-\d{2}-\d|Not Available)$/
