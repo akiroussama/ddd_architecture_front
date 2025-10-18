@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+<link as="style" href="https://fonts.googleapis.com/css2?display=swap&amp;family=Inter:wght@400;500;700;900" onload="this.rel='stylesheet'" rel="stylesheet"/>
+<title>Stitch Design</title>
+<link href="data:image/x-icon;base64," rel="icon" type="image/x-icon"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#f0b4b4",
+              "background-light": "#fdfaf6",
+              "background-dark": "#362a2a",
+            },
+            fontFamily: {
+              display: ["Inter"],
+            },
+            borderRadius: { DEFAULT: "0.5rem", lg: "1rem", xl: "1.5rem", full: "9999px" },
+          },
+        },
+      };
+    </script>
+<style type="text/tailwindcss">
+        :root {
+            --primary-color: #f0b4b4;--secondary-color: #c9e4de;--success-color: #a4c4b5;--warning-color: #fce1a8;--info-color: #b7d7ea;--background-off-white: #fdfaf6;--text-dark-slate-gray: #4a4a4a;--soft-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            --border-light: rgba(0, 0, 0, 0.08);
+            --border-dark: rgba(255, 255, 255, 0.1);
+        }
+        .text-primary-color { color: var(--primary-color); }
+        .bg-primary-color-10 { background-color: rgba(240, 180, 180, 0.1); }
+        .bg-primary-color-20 { background-color: rgba(240, 180, 180, 0.2); }
+        .border-primary-color-20 { border-color: rgba(240, 180, 180, 0.2); }
+        .border-primary-color-30 { border-color: rgba(240, 180, 180, 0.3); }
+        .hover\:bg-primary-color-20:hover { background-color: rgba(240, 180, 180, 0.2); }
+        .hover\:bg-primary-color-30:hover { background-color: rgba(240, 180, 180, 0.3); }
+        .focus\:ring-primary-color:focus { ring-color: var(--primary-color); }
+        .focus\:border-primary-color:focus { border-color: var(--primary-color); }
+        .text-slate-800 { color: var(--text-dark-slate-gray); }
+        .dark .text-slate-800 { color: #fdfaf6; }
+        .text-slate-500 { color: #888; }
+        .dark .text-slate-500 { color: #aaa; }
+        .text-slate-400 { color: #aaa; }
+        .dark .text-slate-400 { color: #ccc; }
+        .bg-white-50 { background-color: rgba(255, 255, 255, 0.7); }
+        .dark .bg-black-20 { background-color: rgba(0, 0, 0, 0.3); }
+        .bg-green-100 { background-color: rgba(164, 196, 181, 0.2); }
+        .text-green-800 { color: var(--success-color); }
+        .dark .bg-green-900 { background-color: rgba(164, 196, 181, 0.4); }
+        .dark .text-green-300 { color: var(--success-color); }
+        .bg-yellow-100 { background-color: rgba(252, 225, 168, 0.2); }
+        .text-yellow-800 { color: var(--warning-color); }
+        .dark .bg-yellow-900 { background-color: rgba(252, 225, 168, 0.4); }
+        .dark .text-yellow-300 { color: var(--warning-color); }
+        .bg-red-100 { background-color: rgba(240, 180, 180, 0.2); }.text-red-800 { color: var(--primary-color); }
+        .dark .bg-red-900 { background-color: rgba(240, 180, 180, 0.4); }
+        .dark .text-red-300 { color: var(--primary-color); }
+        .card-soft-shadow { box-shadow: var(--soft-shadow); }
+        .rounded-organic { border-radius: 50% 30% 40% 60% / 60% 40% 50% 30%; }
+        .input-soft-border { border-color: var(--border-light); }
+        .dark .input-soft-border { border-color: var(--border-dark); }
+        .input-soft-focus:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(240, 180, 180, 0.3);
+            border-color: var(--primary-color);
+        }
+    </style>
+</head>
+<body class="font-display">
+<div class="relative flex h-auto min-h-screen w-full flex-col bg-[var(--background-off-white)] dark:bg-background-dark overflow-x-hidden">
+<div class="flex-1 flex flex-col">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-[var(--primary-color)]/20 dark:border-[var(--primary-color)]/30 px-10 py-3">
+<div class="flex items-center gap-4 text-[var(--text-dark-slate-gray)] dark:text-white">
+<span class="material-symbols-outlined text-[var(--primary-color)]" style="font-size: 24px"> spa </span>
+<h2 class="text-[var(--text-dark-slate-gray)] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">Sensory Compliance Studio</h2>
+</div>
+<div class="flex flex-1 justify-end gap-4 items-center">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[var(--secondary-color)] dark:text-slate-400"> search </span>
+<input class="form-input w-full rounded-full border-[var(--primary-color)]/20 dark:border-[var(--primary-color)]/30 bg-white/0 dark:bg-black/0 focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)] h-10 placeholder:text-[var(--secondary-color)] dark:placeholder:text-slate-400 pl-10 text-base font-normal leading-normal text-[var(--text-dark-slate-gray)] dark:text-white input-soft-border input-soft-focus" placeholder="Search" value=""/>
+</div>
+<div class="flex gap-2">
+<button class="flex items-center justify-center rounded-full h-10 w-10 bg-[var(--primary-color)]/10 dark:bg-[var(--primary-color)]/20 text-[var(--text-dark-slate-gray)] dark:text-white hover:bg-[var(--primary-color)]/20 dark:hover:bg-[var(--primary-color)]/30 transition-colors">
+<span class="material-symbols-outlined"> notifications </span>
+</button>
+<button class="flex items-center justify-center rounded-full h-10 w-10 bg-[var(--primary-color)]/10 dark:bg-[var(--primary-color)]/20 text-[var(--text-dark-slate-gray)] dark:text-white hover:bg-[var(--primary-color)]/20 dark:hover:bg-[var(--primary-color)]/30 transition-colors">
+<span class="material-symbols-outlined"> help </span>
+</button>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCoCO1faPPIFSNBqZE8CTsFKQKkIhChPGlR-RdIaVxzJcXNdp0xOD2XhAq55rGSmi58YU9PUHBG_Bi9YZtx8kPFKkSjYZj5FJy3O_bNbrFlPep85zcLUB2wUdA49zx6f03bbvSLbrPLX7m6TnMfRgW1ghYx9gx3Neecy0nKTDAQS-aVXQYgvj1655lzmXldSVhBt4T4vV1iA-rIGuSfgUOJMcshU9sSe1jEvioM3KgBi9d2RYEsQGfj_ZtrD7NnKcx8qxVkFyA_Ib5Y");'></div>
+</div>
+</header>
+<div class="flex flex-1">
+<aside class="w-64 flex flex-col p-4 border-r border-[var(--primary-color)]/20 dark:border-[var(--primary-color)]/30">
+<div class="flex flex-col gap-4">
+<div class="flex flex-col px-3">
+<h1 class="text-[var(--text-dark-slate-gray)] dark:text-white text-base font-medium leading-normal">CosmoTrack</h1>
+<p class="text-[var(--secondary-color)] dark:text-slate-400 text-sm font-normal leading-normal">v1.2</p>
+</div>
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-[var(--text-dark-slate-gray)] dark:text-white hover:bg-[var(--primary-color)]/10 dark:hover:bg-[var(--primary-color)]/20 transition-colors" href="#">
+<span class="material-symbols-outlined"> dashboard </span>
+<p class="text-sm font-medium">Dashboard</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-[var(--text-dark-slate-gray)] dark:text-white hover:bg-[var(--primary-color)]/10 dark:hover:bg-[var(--primary-color)]/20 transition-colors" href="#">
+<span class="material-symbols-outlined"> palette </span>
+<p class="text-sm font-medium">Formulations</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-[var(--text-dark-slate-gray)] dark:text-white hover:bg-[var(--primary-color)]/10 dark:hover:bg-[var(--primary-color)]/20 transition-colors" href="#">
+<span class="material-symbols-outlined"> nature </span>
+<p class="text-sm font-medium">Ingredients</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--primary-color)]/10 dark:bg-[var(--primary-color)]/20 text-[var(--primary-color)]" href="#">
+<span class="material-symbols-outlined"> texture </span>
+<p class="text-sm font-medium">Sensory Compliance</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-[var(--text-dark-slate-gray)] dark:text-white hover:bg-[var(--primary-color)]/10 dark:hover:bg-[var(--primary-color)]/20 transition-colors" href="#">
+<span class="material-symbols-outlined"> description </span>
+<p class="text-sm font-medium">Documents</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg text-[var(--text-dark-slate-gray)] dark:text-white hover:bg-[var(--primary-color)]/10 dark:hover:bg-[var(--primary-color)]/20 transition-colors" href="#">
+<span class="material-symbols-outlined"> analytics </span>
+<p class="text-sm font-medium">Reports</p>
+</a>
+</nav>
+</div>
+</aside>
+<main class="flex-1 p-6 flex">
+<div class="flex-1 flex flex-col gap-6">
+<div class="flex justify-between items-start">
+<div>
+<h1 class="text-[var(--text-dark-slate-gray)] dark:text-white text-2xl font-bold">Sensory Compliance Studio</h1>
+<p class="text-[var(--secondary-color)] dark:text-slate-500 text-sm">Visualize regulatory compatibility and product applications with tactile clarity</p>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="flex flex-col gap-2 rounded-xl p-4 bg-white/70 dark:bg-black/30 border border-[var(--primary-color)]/20 dark:border-[var(--primary-color)]/30 card-soft-shadow">
+<p class="text-[var(--text-dark-slate-gray)] dark:text-white text-sm font-medium">Compliant Ingredients</p>
+<p class="text-[var(--text-dark-slate-gray)] dark:text-white text-3xl font-bold">250</p>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-4 bg-white/70 dark:bg-black/30 border border-[var(--primary-color)]/20 dark:border-[var(--primary-color)]/30 card-soft-shadow">
+<p class="text-[var(--text-dark-slate-gray)] dark:text-white text-sm font-medium">Brands with Clear Profiles</p>
+<p class="text-[var(--text-dark-slate-gray)] dark:text-white text-3xl font-bold">75</p>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-4 bg-white/70 dark:bg-black/30 border border-[var(--primary-color)]/20 dark:border-[var(--primary-color)]/30 card-soft-shadow">
+<p class="text-[var(--text-dark-slate-gray)] dark:text-white text-sm font-medium">Potential Restrictions Detected</p>
+<p class="text-[var(--primary-color)] text-3xl font-bold">5</p>
+</div>
+</div>
+<div class="flex-1 flex gap-6">
+<div class="flex-1 flex flex-col gap-6">
+<div class="mb-6 flex items-center gap-4">
+<div class="relative flex-1">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[var(--secondary-color)] dark:text-slate-400"> search </span>
+<input class="form-input w-full rounded-full input-soft-border dark:border-[var(--primary-color)]/30 bg-white/70 dark:bg-black/20 focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)] h-12 placeholder:text-[var(--secondary-color)] dark:placeholder:text-slate-400 pl-12 text-base font-normal text-[var(--text-dark-slate-gray)] dark:text-white input-soft-focus" placeholder="Search for ingredients or brands..."/>
+</div>
+<div class="flex gap-2">
+<button class="flex items-center gap-2 rounded-full h-10 px-4 text-sm font-medium bg-[var(--primary-color)]/10 dark:bg-[var(--primary-color)]/20 text-[var(--text-dark-slate-gray)] dark:text-white hover:bg-[var(--primary-color)]/20 dark:hover:bg-[var(--primary-color)]/30 transition-colors">
+<span>Texture Profile</span>
+<span class="material-symbols-outlined text-sm"> expand_more </span>
+</button>
+<button class="flex items-center gap-2 rounded-full h-10 px-4 text-sm font-medium bg-[var(--primary-color)]/10 dark:bg-[var(--primary-color)]/20 text-[var(--text-dark-slate-gray)] dark:text-white hover:bg-[var(--primary-color)]/20 dark:hover:bg-[var(--primary-color)]/30 transition-colors">
+<span>Regulatory Zone</span>
+<span class="material-symbols-outlined text-sm"> expand_more </span>
+</button>
+<button class="flex items-center gap-2 rounded-full h-10 px-4 text-sm font-medium bg-[var(--primary-color)]/10 dark:bg-[var(--primary-color)]/20 text-[var(--text-dark-slate-gray)] dark:text-white hover:bg-[var(--primary-color)]/20 dark:hover:bg-[var(--primary-color)]/30 transition-colors">
+<span>Compatibility</span>
+<span class="material-symbols-outlined text-sm"> expand_more </span>
+</button>
+</div>
+</div>
+<div class="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto pr-2 custom-scrollbar">
+<div class="flex flex-col gap-3 p-4 bg-white/70 dark:bg-black/30 rounded-xl card-soft-shadow border input-soft-border hover:border-[var(--primary-color)]/40 transition-all cursor-pointer">
+<div class="flex justify-between items-center">
+<h3 class="text-lg font-medium text-[var(--text-dark-slate-gray)] dark:text-white">Rose Petal Extract</h3>
+<span class="material-symbols-outlined text-[var(--success-color)]"> check_circle </span>
+</div>
+<p class="text-sm text-[var(--secondary-color)] dark:text-slate-500">Category: Botanical</p>
+<p class="text-sm text-[var(--secondary-color)] dark:text-slate-500">Texture: Silky, hydrating</p>
+<div class="flex justify-between items-center">
+<span class="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Compliant (EU)</span>
+<span class="text-xs text-[var(--secondary-color)] dark:text-slate-400">Last Updated: 2024-01-15</span>
+</div>
+<button class="mt-2 text-[var(--primary-color)] font-medium text-sm text-left">Explore Blend Options</button>
+</div>
+<div class="flex flex-col gap-3 p-4 bg-white/70 dark:bg-black/30 rounded-xl card-soft-shadow border input-soft-border hover:border-[var(--primary-color)]/40 transition-all cursor-pointer">
+<div class="flex justify-between items-center">
+<h3 class="text-lg font-medium text-[var(--text-dark-slate-gray)] dark:text-white">"Glow Essence" Brand</h3>
+<span class="material-symbols-outlined text-[var(--warning-color)]"> warning </span>
+</div>
+<p class="text-sm text-[var(--secondary-color)] dark:text-slate-500">Category: Skincare</p>
+<p class="text-sm text-[var(--secondary-color)] dark:text-slate-500">Profile: Luminous, lightweight</p>
+<div class="flex justify-between items-center">
+<span class="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">Under Review (US)</span>
+<span class="text-xs text-[var(--secondary-color)] dark:text-slate-400">Last Updated: 2024-02-20</span>
+</div>
+<button class="mt-2 text-[var(--primary-color)] font-medium text-sm text-left">Investigate Potential Issues</button>
+</div>
+<div class="flex flex-col gap-3 p-4 bg-white/70 dark:bg-black/30 rounded-xl card-soft-shadow border input-soft-border hover:border-[var(--primary-color)]/40 transition-all cursor-pointer">
+<div class="flex justify-between items-center">
+<h3 class="text-lg font-medium text-[var(--text-dark-slate-gray)] dark:text-white">Almond Oil (Sweet)</h3>
+<span class="material-symbols-outlined text-[var(--success-color)]"> check_circle </span>
+</div>
+<p class="text-sm text-[var(--secondary-color)] dark:text-slate-500">Category: Carrier Oil</p>
+<p class="text-sm text-[var(--secondary-color)] dark:text-slate-500">Texture: Rich, emollient</p>
+<div class="flex justify-between items-center">
+<span class="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Compliant (Global)</span>
+<span class="text-xs text-[var(--secondary-color)] dark:text-slate-400">Last Updated: 2023-12-05</span>
+</div>
+<button class="mt-2 text-[var(--primary-color)] font-medium text-sm text-left">Explore Blend Options</button>
+</div>
+<div class="flex flex-col gap-3 p-4 bg-white/70 dark:bg-black/30 rounded-xl card-soft-shadow border input-soft-border hover:border-[var(--primary-color)]/40 transition-all cursor-pointer">
+<div class="flex justify-between items-center">
+<h3 class="text-lg font-medium text-[var(--text-dark-slate-gray)] dark:text-white">"Bare Essentials" Brand</h3>
+<span class="material-symbols-outlined text-[var(--success-color)]"> check_circle </span>
+</div>
+<p class="text-sm text-[var(--secondary-color)] dark:text-slate-500">Category: Natural Cosmetics</p>
+<p class="text-sm text-[var(--secondary-color)] dark:text-slate-500">Profile: Minimalist, clean</p>
+<div class="flex justify-between items-center">
+<span class="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Compliant (Asia)</span>
+<span class="text-xs text-[var(--secondary-color)] dark:text-slate-400">Last Updated: 2024-03-10</span>
+</div>
+<button class="mt-2 text-[var(--primary-color)] font-medium text-sm text-left">Explore Blend Options</button>
+</div>
+<div class="flex flex-col gap-3 p-4 bg-white/70 dark:bg-black/30 rounded-xl card-soft-shadow border input-soft-border hover:border-[var(--primary-color)]/40 transition-all cursor-pointer">
+<div class="flex justify-between items-center">
+<h3 class="text-lg font-medium text-[var(--text-dark-slate-gray)] dark:text-white">Hyaluronic Acid (Low MW)</h3>
+<span class="material-symbols-outlined text-[var(--success-color)]"> check_circle </span>
+</div>
+<p class="text-sm text-[var(--secondary-color)] dark:text-slate-500">Category: Humectant</p>
+<p class="text-sm text-[var(--secondary-color)] dark:text-slate-500">Texture: Gel-like, plumping</p>
+<div class="flex justify-between items-center">
+<span class="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Compliant (EU)</span>
+<span class="text-xs text-[var(--secondary-color)] dark:text-slate-400">Last Updated: 2024-01-22</span>
+</div>
+<button class="mt-2 text-[var(--primary-color)] font-medium text-sm text-left">Explore Blend Options</button>
+</div>
+<div class="flex flex-col gap-3 p-4 bg-white/70 dark:bg-black/30 rounded-xl card-soft-shadow border input-soft-border hover:border-[var(--primary-color)]/40 transition-all cursor-pointer">
+<div class="flex justify-between items-center">
+<h3 class="text-lg font-medium text-[var(--text-dark-slate-gray)] dark:text-white">"Pure Harmony" Brand</h3>
+<span class="material-symbols-outlined text-[var(--warning-color)]"> warning </span>
+</div>
+<p class="text-sm text-[var(--secondary-color)] dark:text-slate-500">Category: Wellness Beauty</p>
+<p class="text-sm text-[var(--secondary-color)] dark:text-slate-500">Profile: Holistic, calming</p>
+<div class="flex justify-between items-center">
+<span class="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">Under Review (Global)</span>
+<span class="text-xs text-[var(--secondary-color)] dark:text-slate-400">Last Updated: 2024-02-28</span>
+</div>
+<button class="mt-2 text-[var(--primary-color)] font-medium text-sm text-left">Investigate Potential Issues</button>
+</div>
+<div class="flex flex-col gap-3 p-4 bg-white/70 dark:bg-black/30 rounded-xl card-soft-shadow border input-soft-border hover:border-[var(--primary-color)]/40 transition-all cursor-pointer">
+<div class="flex justify-between items-center">
+<h3 class="text-lg font-medium text-[var(--text-dark-slate-gray)] dark:text-white">Titanium Dioxide (Nano)</h3>
+<span class="material-symbols-outlined text-[var(--primary-color)]"> cancel </span>
+</div>
+<p class="text-sm text-[var(--secondary-color)] dark:text-slate-500">Category: UV Filter</p>
+<p class="text-sm text-[var(--secondary-color)] dark:text-slate-500">Texture: Mineral, protective</p>
+<div class="flex justify-between items-center">
+<span class="px-3 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">Restricted (US)</span>
+<span class="text-xs text-[var(--secondary-color)] dark:text-slate-400">Last Updated: 2023-11-18</span>
+</div>
+<button class="mt-2 text-[var(--primary-color)] font-medium text-sm text-left">View Restriction Details</button>
+</div>
+</div>
+</div>
+<div class="w-96 flex flex-col gap-6">
+<div class="rounded-xl p-4 bg-white/70 dark:bg-black/30 border input-soft-border card-soft-shadow flex flex-col h-full">
+<h3 class="text-[var(--text-dark-slate-gray)] dark:text-white text-lg font-bold mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-[var(--primary-color)]">palette</span> Sensory Blend Canvas
+                                </h3>
+<div class="flex-1 border input-soft-border rounded-xl bg-[var(--background-off-white)] dark:bg-black/10 p-4 relative overflow-hidden flex items-center justify-center">
+<p class="text-[var(--secondary-color)] dark:text-slate-500 italic text-center text-sm">Drag &amp; drop ingredient swatches or brand palettes here to visualize their compatibility and blend potential.</p>
+<div class="absolute top-4 left-4 p-2 bg-[var(--primary-color)]/20 rounded-organic text-xs text-[var(--text-dark-slate-gray)] dark:text-white hidden">
+<span class="material-symbols-outlined text-sm align-middle">auto_fix_normal</span> Rose Petal Extract: Hydrating
+                                    </div>
+<div class="absolute bottom-4 right-4 p-2 bg-[var(--warning-color)]/20 rounded-organic text-xs text-[var(--text-dark-slate-gray)] dark:text-white hidden">
+<span class="material-symbols-outlined text-sm align-middle">layers</span> "Glow Essence": High risk blend
+                                    </div>
+</div>
+<div class="flex mt-4 gap-2">
+<button class="flex-1 rounded-full h-10 bg-[var(--primary-color)]/10 dark:bg-[var(--primary-color)]/20 text-[var(--text-dark-slate-gray)] dark:text-white hover:bg-[var(--primary-color)]/20 dark:hover:bg-[var(--primary-color)]/30 transition-colors text-sm font-medium">
+<span class="material-symbols-outlined text-sm align-middle">brush</span> Blend
+                                    </button>
+<button class="flex-1 rounded-full h-10 bg-[var(--primary-color)]/10 dark:bg-[var(--primary-color)]/20 text-[var(--text-dark-slate-gray)] dark:text-white hover:bg-[var(--primary-color)]/20 dark:hover:bg-[var(--primary-color)]/30 transition-colors text-sm font-medium">
+<span class="material-symbols-outlined text-sm align-middle">share</span> Share Vision
+                                    </button>
+</div>
+</div>
+<div class="rounded-xl p-4 bg-white/70 dark:bg-black/30 border input-soft-border card-soft-shadow flex flex-col h-full">
+<h3 class="text-[var(--text-dark-slate-gray)] dark:text-white text-lg font-bold mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-[var(--primary-color)]">chat</span> Collaborative Sensory Feedback
+                                </h3>
+<div class="flex-1 flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar">
+<div class="flex items-start gap-2">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-8" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDK90BzPHZYRW6goQ5p3sL1PrpjKeJ3jAUI-f2Lsoh_oCEFbprrhikLDddzpkEBH83QHT4oXjov4BOfPlb4ntsE4UBzzTDnEeZ6BmMJlClcOqfyL9-HqEnymU42balkQrhq7xSlApX-hp7uAVPriyIDQTAs1kJMlRdYxs0aWCPGmG4gNNrIKNSmlMGOe1tNTKy6xFMfhgqSk9XWL9zfx_6xMOMzJrpy-nzxpjGDT7-sHspliNMWzn4UlUn0LOQ7cd7WYHNZqtP1L3Dl");'></div>
+<div class="bg-[var(--primary-color)]/10 p-3 rounded-xl rounded-bl-none text-sm text-[var(--text-dark-slate-gray)] dark:text-white max-w-[80%]">
+<p class="font-medium">Alice W.</p>
+<p>The Rose Petal Extract feels incredibly smooth on the skin. Great sensory profile!</p>
+<p class="text-xs text-[var(--secondary-color)] dark:text-slate-400 mt-1 text-right">2 min ago</p>
+</div>
+</div>
+<div class="flex items-start gap-2 justify-end">
+<div class="bg-[var(--secondary-color)]/10 p-3 rounded-xl rounded-br-none text-sm text-[var(--text-dark-slate-gray)] dark:text-white max-w-[80%]">
+<p class="font-medium">You</p>
+<p>Agreed, Alice! The texture is perfect for a hydrating serum. What about the "Glow Essence" compatibility?</p>
+<p class="text-xs text-[var(--secondary-color)] dark:text-slate-400 mt-1 text-right">1 min ago</p>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-8" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDK90BzPHZYRW6goQ5p3sL1PrpjKeJ3jAUI-f2Lsoh_oCEFbprrhikLDddzpkEBH83QHT4oXjov4BOfPlb4ntsE4UBzzTDnEeZ6BmMJlClcOqfyL9-HqEnymU42balkQrhq7xSlApX-hp7uAVPriyIDQTAs1kJMlRdYxs0aWCPGmG4gNNrIKNSmlMGOe1tNTKy6xFMfhgqSk9XWL9zfx_6xMOMzJrpy-nzxpjGDT7-sHspliNMWzn4UlUn0LOQ7cd7WYHNZqtP1L3Dl");'></div>
+</div>
+<div class="flex items-start gap-2">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-8" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDK90BzPHZYRW6goQ5p3sL1PrpjKeJ3jAUI-f2Lsoh_oCEFbprrhikLDddzpkEBH83QHT4oXjov4BOfPlb4ntsE4UBzzTDnEeZ6BmMJlClcOqfyL9-HqEnymU42balkQrhq7xSlApX-hp7uAVPriyIDQTAs1kJMlRdYxs0aWCPGmG4gNNrIKNSmlMGOe1tNTKy6xFMfhgqSk9XWL9zfx_6xMOMzJrpy-nzxpjGDT7-sHspliNMWzn4UlUn0LOQ7cd7WYHNZqtP1L3Dl");'></div>
+<div class="bg-[var(--primary-color)]/10 p-3 rounded-xl rounded-bl-none text-sm text-[var(--text-dark-slate-gray)] dark:text-white max-w-[80%]">
+<p class="font-medium">Bob S.</p>
+<p>We need to check the regulatory implications of blending "Glow Essence" due to its shimmer particles.</p>
+<p class="text-xs text-[var(--secondary-color)] dark:text-slate-400 mt-1 text-right">Just now</p>
+</div>
+</div>
+</div>
+<div class="mt-4 flex gap-2">
+<input class="form-input flex-1 rounded-full input-soft-border dark:border-[var(--primary-color)]/30 bg-white/70 dark:bg-black/20 focus:ring-[var(--primary-color)] focus:border-[var(--primary-color)] h-10 placeholder:text-[var(--secondary-color)] dark:placeholder:text-slate-400 pl-4 text-base font-normal text-[var(--text-dark-slate-gray)] dark:text-white input-soft-focus" placeholder="Type your message..."/>
+<button class="flex items-center justify-center rounded-full h-10 w-10 bg-[var(--primary-color)] text-white hover:bg-[var(--primary-color)]/80 transition-colors">
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div></main>
+</div>
+</div>
+</div>
+
+</body></html>
