@@ -85,6 +85,42 @@ const statusConfig: Record<RMStatus, { label: string; icon: React.ElementType; c
   },
 }
 
+function uniqueSorted(values: (string | null | undefined)[]): string[] {
+  return Array.from(
+    new Set(
+      values
+        .filter((value): value is string => Boolean(value))
+        .map((value) => value.trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, "fr"))
+}
+
+function buildQueryFromFilters(filters: RawMaterialFilters): string {
+  const parts: string[] = []
+
+  if (filters.status && filters.status !== "all") {
+    parts.push(`statut:"${filters.status}"`)
+  }
+  if (filters.site) {
+    parts.push(`site:${filters.site}`)
+  }
+  if (filters.supplier) {
+    parts.push(`fourn:"${filters.supplier}"`)
+  }
+  if (filters.inci) {
+    parts.push(`inci:"${filters.inci}"`)
+  }
+  if (filters.favoriteOnly) {
+    parts.push("favorite:true")
+  }
+  if (filters.searchTerm.trim()) {
+    parts.push(filters.searchTerm.trim())
+  }
+
+  return parts.join(" ").trim()
+}
+
 export function RawMaterialsList() {
   const router = useRouter()
   // State
@@ -295,7 +331,9 @@ export function RawMaterialsList() {
 
   // Handlers
   const handleRowClick = (material: RawMaterial) => {
-    router.push(`/raw-materials/${material.id}`)
+    const queryString = buildQueryFromFilters(filters)
+    const suffix = queryString ? `?q=${encodeURIComponent(queryString)}` : ""
+    router.push(`/raw-materials/${material.id}${suffix}`)
   }
 
   const handleBulkDelete = () => {
@@ -305,7 +343,7 @@ export function RawMaterialsList() {
     // Check for dependencies (simplified)
     const hasReferences = materials
       .filter((m) => selectedIds.includes(m.id))
-      .some((m) => m.status === "active")
+      .some((m) => m.status === "Actif")
 
     if (hasReferences) {
       toast.error("Impossible de supprimer des matières actives. Changez d'abord leur statut.")
@@ -327,11 +365,11 @@ export function RawMaterialsList() {
   const clearFilters = () => {
     setFilters({
       searchTerm: "",
-      siteId: null,
-      siteCode: null,
+      site: null,
       status: "all",
-      supplierId: null,
-      inciName: null,
+      supplier: null,
+      inci: null,
+      favoriteOnly: false,
     })
     setShowFilters(false)
   }
@@ -468,6 +506,18 @@ export function RawMaterialsList() {
                   {activeFilterCount}
                 </Badge>
               )}
+            </Button>
+
+            <Button
+              variant={filters.favoriteOnly ? "default" : "ghost"}
+              size="sm"
+              onClick={() =>
+                setFilters((prev) => ({ ...prev, favoriteOnly: !prev.favoriteOnly }))
+              }
+              className="gap-2"
+            >
+              <Star className="h-4 w-4" />
+              Favoris
             </Button>
 
             {activeFilterCount > 0 && (

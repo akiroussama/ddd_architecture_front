@@ -26,6 +26,10 @@ const FIELD_ALIASES: Record<string, string> = {
   fourn: "supplier",
   supplier: "supplier",
   site: "site",
+  favoris: "favorite",
+  favori: "favorite",
+  favorite: "favorite",
+  fav: "favorite",
   statut: "status",
   status: "status",
   state: "status",
@@ -201,6 +205,16 @@ function getFieldMatcher(field: string): FieldMatcher | undefined {
       material.originCountry ? compareField(material.originCountry, value) : false,
     grade: (material, value) =>
       material.grade ? compareField(material.grade, value) : false,
+    favorite: (material, value) => {
+      const normalizedValue = normalize(value)
+      if (!normalizedValue || normalizedValue === "true" || normalizedValue === "1") {
+        return Boolean(material.favorite)
+      }
+      if (normalizedValue === "false" || normalizedValue === "0") {
+        return !material.favorite
+      }
+      return Boolean(material.favorite)
+    },
   }
 
   return matchers[normalized]
