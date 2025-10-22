@@ -1,4 +1,11 @@
-import type { Site, Company, RawMaterial, RawMaterialStatus, RegulatoryNote, NoteAttachment } from "@/shared/types"
+import type {
+  Site,
+  Company,
+  RawMaterial,
+  RMStatus,
+  RegulatoryNote,
+  NoteAttachment,
+} from "@/shared/types"
 
 // Sites with specific code patterns
 export const mockSites: Site[] = [
@@ -283,17 +290,16 @@ function randomItem<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
-function randomStatus(): RawMaterialStatus {
-  const statuses: RawMaterialStatus[] = [
-    "active",
-    "approved",
-    "pending",
-    "review",
-    "discontinued",
-    "restricted",
+function randomStatus(): RMStatus {
+  const statuses: RMStatus[] = [
+    "Actif",
+    "Approuvé",
+    "En attente",
+    "En revue",
+    "Arrêté",
+    "Restreint",
   ]
-  // Weighted distribution
-  const weights = [40, 30, 15, 10, 3, 2] // Higher chance of active/approved
+  const weights = [40, 25, 12, 10, 5, 8]
   const total = weights.reduce((a, b) => a + b, 0)
   let random = Math.random() * total
 

@@ -122,10 +122,6 @@ export function InciDetailView({ entry: initialEntry, onUpdate }: InciDetailView
               <h1 className="text-3xl font-bold text-slate-900">{entry.name}</h1>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>ID: {entry.id}</span>
-                <span>•</span>
-                <span>
-                  Mis à jour le {format(new Date(entry.updatedAt), "d MMMM yyyy", { locale: fr })}
-                </span>
               </div>
             </div>
           </div>

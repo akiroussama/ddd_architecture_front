@@ -136,12 +136,11 @@ export function SubstanceDetailView({
             <h1 className="text-3xl font-semibold text-slate-900">
               {fullTitle}
             </h1>
-            <p className="text-sm text-slate-600">
-                {primaryCas ? ` • CAS: ${primaryCas}` : ""}
-            </p>
+            {primaryCas ? (
+              <p className="text-sm text-slate-600">CAS: {primaryCas}</p>
+            ) : null}
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-              <span className="text-slate-300">•</span>
-              <span>Mis à jour {formatRelativeDate(substance.updatedAt)}</span>
+              <span>Créé le {formatDate(substance.createdAt, "dd MMM yyyy")}</span>
               <span className="text-slate-300">•</span>
               <span>Par {substance.updatedBy}</span>
             </div>

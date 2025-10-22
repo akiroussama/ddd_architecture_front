@@ -256,6 +256,8 @@ export type RawMaterial = {
   risks?: string[]
   keywords?: string[]
   lastViewedAt?: string
+  documents?: Document[]
+  notes?: RegulatoryNote[]
 }
 
 export interface RawMaterialFilters {
