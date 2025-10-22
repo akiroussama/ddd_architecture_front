@@ -294,7 +294,6 @@ export function RMDetailClient({
     <>
       <RMTopBar
         material={activeMaterial}
-        display={displayMaterial}
         query={currentQuery}
         order={currentOrder}
         density={density}
