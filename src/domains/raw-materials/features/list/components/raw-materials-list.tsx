@@ -23,7 +23,6 @@ import {
   Clock,
   XCircle,
   ShieldAlert,
-  AlertCircle,
   Eye,
 } from "lucide-react"
 
@@ -53,39 +52,36 @@ import { mockRawMaterials } from "@/shared/lib/raw-materials-mock-data"
 import type { RawMaterial, RawMaterialFilters, RMStatus } from "@/shared/types"
 
 // Status configuration with colors
-const statusConfig: Record<
-  RawMaterialStatus,
-  { label: string; icon: React.ElementType; className: string }
-> = {
-  active: {
-    label: "Actif",
-    icon: CheckCircle2,
-    className: "bg-green-50 text-green-700 border-green-200",
-  },
-  approved: {
+const statusConfig: Record<RMStatus, { label: string; icon: React.ElementType; className: string }> = {
+  Approuvé: {
     label: "Approuvé",
     icon: CheckCircle2,
     className: "bg-blue-50 text-blue-700 border-blue-200",
   },
-  pending: {
+  Actif: {
+    label: "Actif",
+    icon: CheckCircle2,
+    className: "bg-green-50 text-green-700 border-green-200",
+  },
+  "En attente": {
     label: "En attente",
     icon: Clock,
     className: "bg-yellow-50 text-yellow-700 border-yellow-200",
   },
-  review: {
+  "En revue": {
     label: "En revue",
     icon: Eye,
     className: "bg-purple-50 text-purple-700 border-purple-200",
   },
-  discontinued: {
-    label: "Arrêté",
-    icon: XCircle,
-    className: "bg-gray-50 text-gray-700 border-gray-200",
-  },
-  restricted: {
+  Restreint: {
     label: "Restreint",
     icon: ShieldAlert,
     className: "bg-red-50 text-red-700 border-red-200",
+  },
+  "Arrêté": {
+    label: "Arrêté",
+    icon: XCircle,
+    className: "bg-gray-50 text-gray-700 border-gray-200",
   },
 }
 
@@ -95,11 +91,11 @@ export function RawMaterialsList() {
   const [materials, setMaterials] = React.useState<RawMaterial[]>(mockRawMaterials)
   const [filters, setFilters] = React.useState<RawMaterialFilters>({
     searchTerm: "",
-    siteId: null,
-    siteCode: null,
+    site: null,
     status: "all",
-    supplierId: null,
-    inciName: null,
+    supplier: null,
+    inci: null,
+    favoriteOnly: false,
   })
   const [showFilters, setShowFilters] = React.useState(false)
   const [sorting, setSorting] = React.useState<SortingState>([
@@ -114,55 +110,37 @@ export function RawMaterialsList() {
   // Filtered materials
   const filteredMaterials = React.useMemo(() => {
     return materials.filter((material) => {
-      // Search term (commercial name, case-insensitive)
-      if (
-        filters.searchTerm &&
-        !material.commercialName.toLowerCase().includes(filters.searchTerm.toLowerCase())
-      ) {
-        return false
+      const searchTerm = filters.searchTerm.trim().toLowerCase()
+      if (searchTerm) {
+        const haystack = [
+          material.commercialName,
+          material.inci,
+          material.supplier,
+          material.code,
+          material.site,
+        ]
+        const matches = haystack.some((value) => value.toLowerCase().includes(searchTerm))
+        if (!matches) return false
       }
 
-      // Site filter
-      if (filters.siteId && material.siteId !== filters.siteId) {
-        return false
-      }
-
-      // Status filter
-      if (filters.status !== "all" && material.status !== filters.status) {
-        return false
-      }
-
-      // Supplier filter
-      if (filters.supplierId && material.supplierId !== filters.supplierId) {
-        return false
-      }
-
-      // INCI filter
-      if (filters.inciName && material.inciName !== filters.inciName) {
-        return false
-      }
-
-      // Site Code filter (partial match)
-      if (
-        filters.siteCode &&
-        !material.siteCode.toLowerCase().includes(filters.siteCode.toLowerCase())
-      ) {
-        return false
-      }
+      if (filters.site && material.site !== filters.site) return false
+      if (filters.status !== "all" && material.status !== filters.status) return false
+      if (filters.supplier && material.supplier !== filters.supplier) return false
+      if (filters.inci && material.inci !== filters.inci) return false
+      if (filters.favoriteOnly && !material.favorite) return false
 
       return true
     })
   }, [materials, filters])
 
-  // Active filter count
   const activeFilterCount = React.useMemo(() => {
     let count = 0
     if (filters.searchTerm) count++
-    if (filters.siteId) count++
-    if (filters.siteCode) count++
+    if (filters.site) count++
     if (filters.status !== "all") count++
-    if (filters.supplierId) count++
-    if (filters.inciName) count++
+    if (filters.supplier) count++
+    if (filters.inci) count++
+    if (filters.favoriteOnly) count++
     return count
   }, [filters])
 
