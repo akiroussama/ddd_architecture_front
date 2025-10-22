@@ -423,7 +423,7 @@ export function RawMaterialsList() {
                 onValueChange={(value) =>
                   setFilters((prev) => ({
                     ...prev,
-                    status: value as RawMaterialStatus | "all",
+                    status: value as RMStatus | "all",
                   }))
                 }
               >
@@ -432,14 +432,17 @@ export function RawMaterialsList() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les statuts</SelectItem>
-                  {Object.entries(statusConfig).map(([key, config]) => (
-                    <SelectItem key={key} value={key}>
-                      <Badge className={cn("gap-1.5 border text-xs", config.className)}>
-                        <config.icon className="h-3 w-3" />
-                        {config.label}
-                      </Badge>
-                    </SelectItem>
-                  ))}
+                  {statusOptions.map((status) => {
+                    const config = statusConfig[status]
+                    return (
+                      <SelectItem key={status} value={status}>
+                        <Badge className={cn("gap-1.5 border text-xs", config.className)}>
+                          <config.icon className="h-3 w-3" />
+                          {config.label}
+                        </Badge>
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
             </div>
