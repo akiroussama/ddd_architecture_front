@@ -284,8 +284,8 @@ export function RMDetailClient({
     async (tokenId: string) => {
       const nextParsed = parseQuery(currentQuery)
       const nextQuery = serializeParsedQuery(nextParsed)
-      const { items, order } = applySearch(DATASET, parseQuery(nextQuery))
-      applyQueryState(nextQuery, order, items)
+      const { matches, order } = applySearch(DATASET, parseQuery(nextQuery))
+      applyQueryState(nextQuery, order, matches)
     },
     [applyQueryState, currentQuery]
   )
@@ -303,7 +303,7 @@ export function RMDetailClient({
         views={views}
         onNavigate={handleNavigate}
         onOpenCommand={() => setCommandOpen(true)}
-        onToggleFavorite={handleToggleFavorite}
+        onToggleFavorite={() => handleToggleFavorite(activeMaterial.id, !activeMaterial.favorite)}
         onToggleFavoriteBookmark={(id) => handleToggleFavorite(id)}
         onSelectBookmark={handleBookmarkSelect}
         onRemoveRecent={handleRemoveRecent}

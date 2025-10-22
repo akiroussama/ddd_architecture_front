@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(tree -L 4 -I 'node_modules' src/)"
+      "Bash(tree -L 4 -I 'node_modules' src/)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

@@ -250,9 +250,10 @@ export function RMCommand({
   useEffect(() => {
     if (!open) return
     if (highlightIndex >= entries.length) {
-      setHighlightIndex(entries.length ? entries.length - 1 : 0)
+      setHighlightIndex(recentsShown.length + favoritesShown.length)
     }
-  }, [entries.length, highlightIndex, open])
+}, [open, query, initialOrder, initialResults, onPeek, recentsShown.length, favoritesShown.length])
+
 
   const highlightedEntry = entries[highlightIndex] ?? null
 
@@ -423,16 +424,26 @@ export function RMCommand({
     onRefreshBookmarks()
   }
 
-  const highlightedMaterial =
-    highlightedEntry?.kind === "result" ? highlightedEntry.item : null
+// avant:
+// const highlightedMaterial =
+//   highlightedEntry?.kind === "result" ? highlightedEntry.item : null;
+
+// après:
+const highlightedMaterial =
+  highlightedEntry
+    ? highlightedEntry.kind === "result"
+      ? highlightedEntry.item
+      : dataset.find((m) => m.id === highlightedEntry.item.id) ?? null
+    : null
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl overflow-hidden border border-border p-0">
+      <DialogContent className="max-w-[min(95vw,1400px)] overflow-hidden rounded-2xl border border-border p-0">
         <DialogTitle className="sr-only">
           Palette de recherche matières premières
         </DialogTitle>
-        <div className="flex min-h-[540px] flex-col md:flex-row">
+        <div className="flex min-h-[520px] max-h-[80vh] flex-col md:flex-row">
           <div className="flex flex-1 flex-col border-b border-border md:border-b-0 md:border-r">
             <div className="px-4 pb-2 pt-4">
               <div className="flex items-center justify-between gap-2">
@@ -575,7 +586,7 @@ export function RMCommand({
                             material={material}
                             isActive={isActive}
                             height={itemHeight}
-                            onClick={() =>
+                            onDoubleClick={() =>
                               handleSelectEntry(
                                 { kind: "result", item: material, index: startIndex + idx },
                                 { newTab: false }
@@ -674,7 +685,7 @@ function ScrollSection({
             <div className="px-2 pb-2 text-right">
               {onFavoriteToggle ? (
                 <Button
-                  size="xs"
+                  size="sm"
                   variant="ghost"
                   className="text-muted-foreground hover:text-foreground"
                   onClick={() => onFavoriteToggle(bookmark)}
@@ -685,7 +696,7 @@ function ScrollSection({
               ) : null}
               {onRemove ? (
                 <Button
-                  size="xs"
+                  size="sm"
                   variant="ghost"
                   className="text-muted-foreground hover:text-destructive"
                   onClick={() => onRemove(bookmark)}
@@ -706,14 +717,14 @@ type ResultRowProps = {
   material: RawMaterial
   isActive: boolean
   height: number
-  onClick: () => void
+  onDoubleClick: () => void
 }
 
-function ResultRow({ material, isActive, height, onClick }: ResultRowProps) {
+function ResultRow({ material, isActive, height, onDoubleClick }: ResultRowProps) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={onDoubleClick}
       role="option"
       id={material.id}
       aria-selected={isActive}
@@ -884,7 +895,7 @@ function FacetBar({ facets, options, onToggle }: FacetBarProps) {
         onToggle={(value) => onToggle("grade", value)}
       />
       <Button
-        size="xs"
+        size="sm"
         variant={facets.favorite ? "default" : "outline"}
         className="rounded-full px-3 text-[11px]"
         onClick={() => onToggle("favorite", facets.favorite ? "false" : "true")}

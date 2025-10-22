@@ -11,13 +11,14 @@ const PatchSchema = z.object({
 })
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export async function GET(_: Request, { params }: RouteParams) {
-  const material = getRawMaterial(params.id)
+  const { id } = await params
+  const material = getRawMaterial(id)
 
   if (!material) {
     return NextResponse.json({ error: "Raw material not found" }, { status: 404 })
@@ -27,12 +28,20 @@ export async function GET(_: Request, { params }: RouteParams) {
 }
 
 export async function PATCH(request: Request, { params }: RouteParams) {
+  const { id } = await params
   const payload = await request.json()
   const parsed = PatchSchema.safeParse(payload)
 
-  if (!parsed.success || (!parsed.data.casEcPairs && typeof parsed.data.favorite === "undefined")) {
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "Invalid payload", issues: parsed.error.issues },
+      { error: "Invalid payload", issues: parsed.error?.issues },
+      { status: 400 }
+    )
+  }
+
+  if (!parsed.data.casEcPairs && typeof parsed.data.favorite === "undefined") {
+    return NextResponse.json(
+      { error: "At least one field (casEcPairs or favorite) is required" },
       { status: 400 }
     )
   }
@@ -41,11 +50,11 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   let updated: RawMaterial | undefined
 
   if (casEcPairs) {
-    updated = replaceCasEcPairs(params.id, casEcPairs)
+    updated = replaceCasEcPairs(id, casEcPairs)
   }
 
   if (typeof favorite === "boolean") {
-    updated = toggleFavorite(params.id, favorite) ?? updated
+    updated = toggleFavorite(id, favorite) ?? updated
   }
 
   if (!updated) {
