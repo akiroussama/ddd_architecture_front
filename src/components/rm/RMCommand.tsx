@@ -38,7 +38,7 @@ import type {
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
 import { Command, CommandInput } from "@/shared/ui/command"
-import { Dialog, DialogContent } from "@/shared/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/shared/ui/dialog"
 import { Separator } from "@/shared/ui/separator"
 import { ScrollArea } from "@/shared/ui/scroll-area"
 import { cn, formatRelativeDate } from "@/shared/lib/utils"
@@ -429,6 +429,9 @@ export function RMCommand({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl overflow-hidden border border-border p-0">
+        <DialogTitle className="sr-only">
+          Palette de recherche matières premières
+        </DialogTitle>
         <div className="flex min-h-[540px] flex-col md:flex-row">
           <div className="flex flex-1 flex-col border-b border-border md:border-b-0 md:border-r">
             <div className="px-4 pb-2 pt-4">
