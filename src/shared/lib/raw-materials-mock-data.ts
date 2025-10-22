@@ -5,6 +5,7 @@ import type {
   RMStatus,
   RegulatoryNote,
   NoteAttachment,
+  CasEcPair,
 } from "@/shared/types"
 
 // Sites with specific code patterns
@@ -317,6 +318,12 @@ function randomDate(daysBack: number): string {
   return date.toISOString()
 }
 
+function futureDate(daysAhead: number): string {
+  const date = new Date()
+  date.setDate(date.getDate() + Math.floor(Math.random() * daysAhead))
+  return date.toISOString()
+}
+
 // Commercial names generator
 const commercialPrefixes = [
   "Ultra", "Pro", "Max", "Pure", "Bio", "Eco", "Natural", "Premium",
@@ -344,6 +351,126 @@ function generateCommercialName(): string {
   if (useSuffix) name += randomItem(commercialSuffixes)
 
   return name.trim() || "Premium Care Formula"
+}
+
+const SOURCE_CHOICES = ["CosIng 2014", "Supplier CoA", "ECHA", "IFRA 51e", "Internal QA"]
+
+const riskBadges = [
+  "Allergène 26",
+  "CMR Suspecté",
+  "IFRA restreint",
+  "Sensibilisant",
+  "Interne - Alerte qualité",
+]
+
+const allergenPool = ["Limonene", "Linalool", "Citral", "Geraniol", "Coumarin", "Benzyl Alcohol"]
+const ifraCategories = ["Cat 1", "Cat 2", "Cat 3", "Cat 4", "Cat 5", "Cat 6"]
+
+function uniqueId(prefix: string, index: number): string {
+  const random = Math.random().toString(36).slice(2, 10)
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    try {
+      return crypto.randomUUID()
+    } catch {
+      /* noop fallback to composed id */
+    }
+  }
+  return `${prefix}-${index}-${random}`
+}
+
+function generateCasNumber(): string {
+  const part1Length = Math.floor(Math.random() * 5) + 2 // 2 - 7 digits
+  let part1 = ""
+  for (let i = 0; i < part1Length; i++) {
+    const digit = Math.floor(Math.random() * 10)
+    part1 += i === 0 && digit === 0 ? digit + 1 : digit
+  }
+
+  const part2 = String(Math.floor(Math.random() * 100)).padStart(2, "0")
+  const digits = `${part1}${part2}`.split("").reverse()
+  const checksum =
+    digits.reduce((total, digit, index) => total + Number(digit) * (index + 1), 0) % 10
+
+  return `${part1}-${part2}-${checksum}`
+}
+
+function generateEcNumber(): string {
+  const part1 = String(Math.floor(Math.random() * 900) + 100).padStart(3, "0")
+  const part2 = String(Math.floor(Math.random() * 900) + 100).padStart(3, "0")
+  const part3 = String(Math.floor(Math.random() * 10))
+  return `${part1}-${part2}-${part3}`
+}
+
+function pickSources(): string[] {
+  const count = 1 + Math.floor(Math.random() * Math.min(3, SOURCE_CHOICES.length))
+  const shuffled = [...SOURCE_CHOICES].sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, count)
+}
+
+function randomSubset<T>(source: T[], max = source.length, min = 0): T[] {
+  if (!source.length || max === 0) return []
+  const upper = Math.min(max, source.length)
+  const lower = Math.min(min, upper)
+  const count = Math.max(lower, Math.floor(Math.random() * (upper + 1)))
+  if (count === 0) return []
+  const clone = [...source]
+  for (let i = clone.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[clone[i], clone[j]] = [clone[j], clone[i]]
+  }
+  return clone.slice(0, count)
+}
+
+function generateCasPairs(inci: string, index: number): CasEcPair[] {
+  const upperInci = inci.toUpperCase()
+  if (upperInci === "TOCOPHEROL") {
+    return [
+      {
+        id: uniqueId("cas", index),
+        cas: "10191-41-0",
+        ec: "233-466-0",
+        sources: ["CosIng 2014"],
+        note: "Profil vitamine E naturelle",
+      },
+      {
+        id: uniqueId("cas", index + 1000),
+        cas: "10191-41-0",
+        ec: "240-747-1",
+        sources: ["CosIng 2014"],
+      },
+    ]
+  }
+
+  if (upperInci === "GERANIOL") {
+    return [
+      {
+        id: uniqueId("cas", index),
+        cas: "97-47-4",
+        ec: "960-99-5",
+        sources: ["CosIng 2014", "Supplier CoA"],
+        note: "Conforme réglementation UE parfum",
+      },
+    ]
+  }
+
+  const pairCount = 1 + Math.floor(Math.random() * 2)
+  const pairs: CasEcPair[] = []
+  const seen = new Set<string>()
+
+  while (pairs.length < pairCount) {
+    const cas = generateCasNumber()
+    if (seen.has(cas)) continue
+    seen.add(cas)
+    pairs.push({
+      id: uniqueId("cas", index + pairs.length),
+      cas,
+      ec: Math.random() > 0.4 ? generateEcNumber() : undefined,
+      sources: pickSources(),
+      note: Math.random() > 0.8 ? "Synchroniser avec IFRA prochaine révision." : undefined,
+    })
+  }
+
+  return pairs
 }
 
 // Realistic conversation templates for different raw materials scenarios
@@ -637,14 +764,69 @@ function generateConversationNotes(materialName: string, index: number): Regulat
 export function generateMockRawMaterials(count: number = 120): RawMaterial[] {
   const materials: RawMaterial[] = []
   const usedCommercialNames = new Set<string>()
+  const usedCodes = new Set<string>()
 
-  for (let i = 0; i < count; i++) {
-    const site = randomItem(mockSites)
-    const company = randomItem(mockCompanies)
-    const inciName = randomItem(mockInciNames)
+  const gradeOptions = [
+    "Pharmaceutical",
+    "Cosmétique",
+    "Technique",
+    "Food Grade",
+    "Bio",
+    "USP",
+  ]
 
-    // Generate unique commercial name
-    let commercialName = generateCommercialName()
+  const originFallbacks = ["France", "Germany", "USA", "Spain", "Italy", "India", "China", "Brazil"]
+
+  const baseMaterials: Array<Partial<RawMaterial> & { id: string }> = [
+    {
+      id: "rm-001",
+      commercialName: "TocoShield 70",
+      supplier: "BASF",
+      site: "FR-LYO",
+      status: "Approuvé",
+      inci: "TOCOPHEROL",
+      grade: "Pharmaceutical",
+      originCountry: "France",
+      favorite: true,
+      documentsCount: 4,
+      certificationsCount: 3,
+      ifraCategory: "Cat 3",
+      risks: ["IFRA restreint"],
+      keywords: ["vitamine e", "antioxydant", "basf"],
+    },
+    {
+      id: "rm-002",
+      commercialName: "GeraniPure Select",
+      supplier: "Givaudan",
+      site: "DE-BER",
+      status: "Actif",
+      inci: "GERANIOL",
+      grade: "Pharmaceutical",
+      originCountry: "Germany",
+      favorite: false,
+      documentsCount: 2,
+      certificationsCount: 1,
+      ifraCategory: "Cat 5",
+      allergens: ["Geraniol"],
+      risks: ["Allergène 26"],
+    },
+  ]
+
+  const createMaterial = (
+    index: number,
+    overrides: Partial<RawMaterial> & { id?: string } = {}
+  ): RawMaterial => {
+    const siteRecord =
+      overrides.site !== undefined
+        ? mockSites.find((site) => site.code === overrides.site) ?? randomItem(mockSites)
+        : randomItem(mockSites)
+
+    const supplierName =
+      overrides.supplier ?? randomItem(mockCompanies).name
+
+    const inci = overrides.inci ?? randomItem(mockInciNames)
+
+    let commercialName = overrides.commercialName ?? generateCommercialName()
     let attempts = 0
     while (usedCommercialNames.has(commercialName.toLowerCase()) && attempts < 10) {
       commercialName = generateCommercialName()
@@ -652,40 +834,87 @@ export function generateMockRawMaterials(count: number = 120): RawMaterial[] {
     }
     usedCommercialNames.add(commercialName.toLowerCase())
 
-    // Site-specific code
-    const siteCode = generateSiteCode(site, i + 1)
+    let code = overrides.code ?? generateSiteCode(siteRecord, index + 1)
+    let codeAttempts = 0
+    while (usedCodes.has(code) && codeAttempts < 5) {
+      code = generateSiteCode(siteRecord, index + codeAttempts + 2)
+      codeAttempts++
+    }
+    usedCodes.add(code)
 
-    // Add conversation notes to first 25 materials (5 for each template)
-    const notes = i < 25 ? generateConversationNotes(commercialName, i) : undefined
+    const status = overrides.status ?? randomStatus()
+    const originCountry =
+      overrides.originCountry ?? siteRecord.country ?? randomItem(originFallbacks)
+    const grade = overrides.grade ?? randomItem(gradeOptions)
+    const productionSiteName =
+      overrides.productionSiteName ?? siteRecord.name
+    const lot =
+      overrides.lot ?? `LOT-${siteRecord.code}-${String(index + 101).padStart(3, "0")}`
+    const expirationDate =
+      overrides.expirationDate ?? (Math.random() > 0.55 ? futureDate(540) : undefined)
+    const updatedAt = overrides.updatedAt ?? randomDate(180)
+    const documentsCount =
+      overrides.documentsCount ?? (Math.random() > 0.6 ? Math.floor(Math.random() * 5) + 1 : 0)
+    const certificationsCount =
+      overrides.certificationsCount ?? (Math.random() > 0.7 ? Math.floor(Math.random() * 3) + 1 : 0)
+    const favorite =
+      typeof overrides.favorite === "boolean" ? overrides.favorite : Math.random() > 0.82
+    const casEcPairs = overrides.casEcPairs ?? generateCasPairs(inci, index)
+    const allergens = overrides.allergens ?? randomSubset(allergenPool, 2)
+    const ifraCategory =
+      overrides.ifraCategory ?? randomItem(ifraCategories)
+    const risks = overrides.risks ?? randomSubset(riskBadges, 2)
+    const keywords =
+      overrides.keywords ??
+      [commercialName, inci, supplierName, siteRecord.code, grade, originCountry]
+        .filter((value): value is string => Boolean(value))
+        .map((value) => value.toLowerCase())
+    const lastViewedAt =
+      overrides.lastViewedAt ?? (Math.random() > 0.85 ? randomDate(30) : undefined)
+    const notes =
+      overrides.notes ?? (index < 12 ? generateConversationNotes(commercialName, index) : undefined)
 
-    materials.push({
-      id: `rm-${i + 1}`,
+    return {
+      id: overrides.id ?? `rm-${index + 1}`,
       commercialName,
-      supplierId: company.id,
-      siteId: site.id,
-      siteCode,
-      status: randomStatus(),
-      inciName,
-      cas: Math.random() > 0.3 ? `${Math.floor(Math.random() * 9999)}-${Math.floor(Math.random() * 99)}-${Math.floor(Math.random() * 9)}` : undefined,
-      einecs: Math.random() > 0.5 ? `${Math.floor(Math.random() * 999)}-${Math.floor(Math.random() * 999)}-${Math.floor(Math.random() * 9)}` : undefined,
-      percentage: Math.random() > 0.4 ? Math.floor(Math.random() * 100) : undefined,
-      grade: randomItem(["Pharmaceutical", "Cosmetic", "Technical", "Food Grade", "USP", "NF"]),
-      origin: randomItem(["France", "Germany", "USA", "China", "India", "Italy", "Spain", "UK"]),
-      batch: `LOT-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
-      expiryDate: Math.random() > 0.3 ? randomDate(-365) : undefined,
-      certifications: Math.random() > 0.5
-        ? [randomItem(["ISO 9001", "GMP", "ECOCERT", "COSMOS", "Organic", "Halal", "Kosher"])]
-        : undefined,
-      createdAt: randomDate(730), // Up to 2 years ago
-      createdBy: randomItem(["Alice Martin", "Bob Chen", "Carol Smith", "David Brown", "Eva Garcia"]),
-      updatedAt: randomDate(180), // Up to 6 months ago
-      updatedBy: randomItem(["Alice Martin", "Bob Chen", "Carol Smith", "David Brown", "Eva Garcia"]),
+      code,
+      inci,
+      supplier: supplierName,
+      site: siteRecord.code,
+      status,
+      updatedAt,
+      documentsCount,
+      certificationsCount,
+      favorite,
+      originCountry,
+      grade,
+      lot,
+      expirationDate,
+      productionSiteName,
+      casEcPairs,
+      allergens,
+      ifraCategory,
+      risks,
+      keywords,
+      lastViewedAt,
+      documents: overrides.documents,
       notes,
-    })
+    }
   }
 
-  return materials.sort((a, b) =>
-    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  const baseToUse =
+    count >= baseMaterials.length ? baseMaterials : baseMaterials.slice(0, count)
+
+  for (const base of baseToUse) {
+    materials.push(createMaterial(materials.length, base))
+  }
+
+  while (materials.length < count) {
+    materials.push(createMaterial(materials.length))
+  }
+
+  return materials.sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   )
 }
 

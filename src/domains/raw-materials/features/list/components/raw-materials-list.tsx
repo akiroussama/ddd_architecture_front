@@ -49,14 +49,8 @@ import {
 } from "@/shared/ui/table"
 import { cn } from "@/shared/lib/utils"
 import { formatRelativeDate } from "@/shared/lib/utils"
-import {
-  mockRawMaterials,
-  mockSites,
-  mockCompanies,
-  mockInciNames,
-  generateMockRawMaterials,
-} from "@/shared/lib/raw-materials-mock-data"
-import type { RawMaterial, RawMaterialStatus, RawMaterialFilters } from "@/shared/types"
+import { mockRawMaterials } from "@/shared/lib/raw-materials-mock-data"
+import type { RawMaterial, RawMaterialFilters, RMStatus } from "@/shared/types"
 
 // Status configuration with colors
 const statusConfig: Record<
