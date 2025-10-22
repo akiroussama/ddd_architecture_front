@@ -23,6 +23,7 @@ import {
   Clock,
   XCircle,
   ShieldAlert,
+  Star,
   Eye,
 } from "lucide-react"
 
