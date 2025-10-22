@@ -439,7 +439,7 @@ const highlightedMaterial =
 
   return (
      <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-none overflow-hidden rounded-2xl border border-border p-0">
+      <DialogContent className="max-w-[min(98vw,1800px)] overflow-hidden rounded-2xl border border-border p-0">
          <DialogTitle className="sr-only">
            Palette de recherche matières premières
          </DialogTitle>
