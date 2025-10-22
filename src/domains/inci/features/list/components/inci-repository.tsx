@@ -120,12 +120,16 @@ export function InciRepository() {
   }, [debouncedSearch, columnFilters])
 
   const euSources = useMemo(() => {
-    const values = entries.map((entry) => entry.euInventorySource).filter(Boolean)
+    const values = entries
+      .map((entry) => entry.euInventorySource)
+      .filter((source): source is string => Boolean(source && source.trim()))
     return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" }))
   }, [entries])
 
   const usSources = useMemo(() => {
-    const values = entries.map((entry) => entry.usInventorySource).filter(Boolean)
+    const values = entries
+      .map((entry) => entry.usInventorySource)
+      .filter((source): source is string => Boolean(source && source.trim()))
     return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" }))
   }, [entries])
 
@@ -225,13 +229,14 @@ export function InciRepository() {
         header: buildSortableHeader("Source Inventaire UE"),
         cell: ({ row }) => (
           <span className="w-[180px] text-sm text-slate-600">
-            {row.original.euInventorySource}
+            {row.original.euInventorySource || "—"}
           </span>
         ),
         size: 180,
         filterFn: (row, id, value) => {
           if (!value) return true
-          return row.getValue<string>(id) === value
+          const cellValue = row.getValue<string | undefined>(id)
+          return cellValue === value
         }
       },
       {
@@ -239,13 +244,14 @@ export function InciRepository() {
         header: buildSortableHeader("Source Inventaire US"),
         cell: ({ row }) => (
           <span className="w-[180px] text-sm text-slate-600">
-            {row.original.usInventorySource}
+            {row.original.usInventorySource || "—"}
           </span>
         ),
         size: 180,
         filterFn: (row, id, value) => {
           if (!value) return true
-          return row.getValue<string>(id) === value
+          const cellValue = row.getValue<string | undefined>(id)
+          return cellValue === value
         }
       },
       {
@@ -358,14 +364,6 @@ export function InciRepository() {
       nextErrors.name = "Ce nom INCI existe déjà dans le référentiel."
     }
 
-    if (!formValues.euInventorySource.trim()) {
-      nextErrors.euInventorySource = "Indiquez une source inventaire UE."
-    }
-
-    if (!formValues.usInventorySource.trim()) {
-      nextErrors.usInventorySource = "Indiquez une source inventaire US."
-    }
-
     if (Object.keys(nextErrors).length) {
       setFormErrors(nextErrors)
       return
@@ -379,8 +377,8 @@ export function InciRepository() {
         name: trimmedName,
         annexReference: formValues.annexReference.trim() || undefined,
         usMonograph: formValues.usMonograph.trim() || undefined,
-        euInventorySource: formValues.euInventorySource.trim(),
-        usInventorySource: formValues.usInventorySource.trim(),
+        euInventorySource: formValues.euInventorySource.trim() || undefined,
+        usInventorySource: formValues.usInventorySource.trim() || undefined,
         comment: formValues.comment.trim() || undefined,
         updatedAt: timestamp,
         updatedBy: "Marie Dubois"
@@ -396,8 +394,8 @@ export function InciRepository() {
         name: trimmedName,
         annexReference: formValues.annexReference.trim() || undefined,
         usMonograph: formValues.usMonograph.trim() || undefined,
-        euInventorySource: formValues.euInventorySource.trim(),
-        usInventorySource: formValues.usInventorySource.trim(),
+        euInventorySource: formValues.euInventorySource.trim() || undefined,
+        usInventorySource: formValues.usInventorySource.trim() || undefined,
         comment: formValues.comment.trim() || undefined,
         createdAt: timestamp,
         createdBy: "Marie Dubois",
@@ -714,38 +712,24 @@ export function InciRepository() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
-                <Label htmlFor="eu-inventory">Source Inventaire UE *</Label>
+                <Label htmlFor="eu-inventory">Source Inventaire UE</Label>
                 <Input
                   id="eu-inventory"
                   value={formValues.euInventorySource}
                   onChange={(event) => {
                     setFormValues((prev) => ({ ...prev, euInventorySource: event.target.value }))
-                    if (formErrors.euInventorySource) {
-                      setFormErrors((prev) => ({ ...prev, euInventorySource: undefined }))
-                    }
                   }}
-                  aria-invalid={Boolean(formErrors.euInventorySource)}
                 />
-                {formErrors.euInventorySource ? (
-                  <p className="text-sm text-destructive">{formErrors.euInventorySource}</p>
-                ) : null}
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="us-inventory">Source Inventaire US *</Label>
+                <Label htmlFor="us-inventory">Source Inventaire US</Label>
                 <Input
                   id="us-inventory"
                   value={formValues.usInventorySource}
                   onChange={(event) => {
                     setFormValues((prev) => ({ ...prev, usInventorySource: event.target.value }))
-                    if (formErrors.usInventorySource) {
-                      setFormErrors((prev) => ({ ...prev, usInventorySource: undefined }))
-                    }
                   }}
-                  aria-invalid={Boolean(formErrors.usInventorySource)}
                 />
-                {formErrors.usInventorySource ? (
-                  <p className="text-sm text-destructive">{formErrors.usInventorySource}</p>
-                ) : null}
               </div>
             </div>
             <div className="flex flex-col gap-2">

@@ -25,9 +25,14 @@ export async function generateMetadata({ params }: SubstanceDetailPageProps): Pr
     }
   }
 
+  const inciEurope = substance.inciEU?.trim() || ""
+  const inciUSA = substance.inciUS?.trim() || ""
+  const primaryTitle = inciEurope || inciUSA || substance.technicalName || substance.id
+  const titleSuffix = "INCI Europe / INCI USA"
+
   return {
-    title: `${substance.inciEU} | GeberGuard PLM`,
-    description: `Fiche réglementaire et opérationnelle pour la substance ${substance.inciEU}.`
+    title: `${primaryTitle} – ${titleSuffix} | GeberGuard PLM`,
+    description: `Fiche réglementaire et opérationnelle pour la substance ${primaryTitle}.`
   }
 }
 

@@ -23,7 +23,7 @@ import {
   Clock,
   XCircle,
   ShieldAlert,
-  AlertCircle,
+  Star,
   Eye,
 } from "lucide-react"
 
@@ -49,50 +49,77 @@ import {
 } from "@/shared/ui/table"
 import { cn } from "@/shared/lib/utils"
 import { formatRelativeDate } from "@/shared/lib/utils"
-import {
-  mockRawMaterials,
-  mockSites,
-  mockCompanies,
-  mockInciNames,
-  generateMockRawMaterials,
-} from "@/shared/lib/raw-materials-mock-data"
-import type { RawMaterial, RawMaterialStatus, RawMaterialFilters } from "@/shared/types"
+import { mockRawMaterials } from "@/shared/lib/raw-materials-mock-data"
+import type { RawMaterial, RawMaterialFilters, RMStatus } from "@/shared/types"
 
 // Status configuration with colors
-const statusConfig: Record<
-  RawMaterialStatus,
-  { label: string; icon: React.ElementType; className: string }
-> = {
-  active: {
-    label: "Actif",
-    icon: CheckCircle2,
-    className: "bg-green-50 text-green-700 border-green-200",
-  },
-  approved: {
+const statusConfig: Record<RMStatus, { label: string; icon: React.ElementType; className: string }> = {
+  Approuvé: {
     label: "Approuvé",
     icon: CheckCircle2,
     className: "bg-blue-50 text-blue-700 border-blue-200",
   },
-  pending: {
+  Actif: {
+    label: "Actif",
+    icon: CheckCircle2,
+    className: "bg-green-50 text-green-700 border-green-200",
+  },
+  "En attente": {
     label: "En attente",
     icon: Clock,
     className: "bg-yellow-50 text-yellow-700 border-yellow-200",
   },
-  review: {
+  "En revue": {
     label: "En revue",
     icon: Eye,
     className: "bg-purple-50 text-purple-700 border-purple-200",
   },
-  discontinued: {
-    label: "Arrêté",
-    icon: XCircle,
-    className: "bg-gray-50 text-gray-700 border-gray-200",
-  },
-  restricted: {
+  Restreint: {
     label: "Restreint",
     icon: ShieldAlert,
     className: "bg-red-50 text-red-700 border-red-200",
   },
+  "Arrêté": {
+    label: "Arrêté",
+    icon: XCircle,
+    className: "bg-gray-50 text-gray-700 border-gray-200",
+  },
+}
+
+function uniqueSorted(values: (string | null | undefined)[]): string[] {
+  return Array.from(
+    new Set(
+      values
+        .filter((value): value is string => Boolean(value))
+        .map((value) => value.trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, "fr"))
+}
+
+function buildQueryFromFilters(filters: RawMaterialFilters): string {
+  const parts: string[] = []
+
+  if (filters.status && filters.status !== "all") {
+    parts.push(`statut:"${filters.status}"`)
+  }
+  if (filters.site) {
+    parts.push(`site:${filters.site}`)
+  }
+  if (filters.supplier) {
+    parts.push(`fourn:"${filters.supplier}"`)
+  }
+  if (filters.inci) {
+    parts.push(`inci:"${filters.inci}"`)
+  }
+  if (filters.favoriteOnly) {
+    parts.push("favorite:true")
+  }
+  if (filters.searchTerm.trim()) {
+    parts.push(filters.searchTerm.trim())
+  }
+
+  return parts.join(" ").trim()
 }
 
 export function RawMaterialsList() {
@@ -101,11 +128,11 @@ export function RawMaterialsList() {
   const [materials, setMaterials] = React.useState<RawMaterial[]>(mockRawMaterials)
   const [filters, setFilters] = React.useState<RawMaterialFilters>({
     searchTerm: "",
-    siteId: null,
-    siteCode: null,
+    site: null,
     status: "all",
-    supplierId: null,
-    inciName: null,
+    supplier: null,
+    inci: null,
+    favoriteOnly: false,
   })
   const [showFilters, setShowFilters] = React.useState(false)
   const [sorting, setSorting] = React.useState<SortingState>([
@@ -120,57 +147,53 @@ export function RawMaterialsList() {
   // Filtered materials
   const filteredMaterials = React.useMemo(() => {
     return materials.filter((material) => {
-      // Search term (commercial name, case-insensitive)
-      if (
-        filters.searchTerm &&
-        !material.commercialName.toLowerCase().includes(filters.searchTerm.toLowerCase())
-      ) {
-        return false
+      const searchTerm = filters.searchTerm.trim().toLowerCase()
+      if (searchTerm) {
+        const haystack = [
+          material.commercialName,
+          material.inci,
+          material.supplier,
+          material.code,
+          material.site,
+        ]
+        const matches = haystack.some((value) => value.toLowerCase().includes(searchTerm))
+        if (!matches) return false
       }
 
-      // Site filter
-      if (filters.siteId && material.siteId !== filters.siteId) {
-        return false
-      }
-
-      // Status filter
-      if (filters.status !== "all" && material.status !== filters.status) {
-        return false
-      }
-
-      // Supplier filter
-      if (filters.supplierId && material.supplierId !== filters.supplierId) {
-        return false
-      }
-
-      // INCI filter
-      if (filters.inciName && material.inciName !== filters.inciName) {
-        return false
-      }
-
-      // Site Code filter (partial match)
-      if (
-        filters.siteCode &&
-        !material.siteCode.toLowerCase().includes(filters.siteCode.toLowerCase())
-      ) {
-        return false
-      }
+      if (filters.site && material.site !== filters.site) return false
+      if (filters.status !== "all" && material.status !== filters.status) return false
+      if (filters.supplier && material.supplier !== filters.supplier) return false
+      if (filters.inci && material.inci !== filters.inci) return false
+      if (filters.favoriteOnly && !material.favorite) return false
 
       return true
     })
   }, [materials, filters])
 
-  // Active filter count
   const activeFilterCount = React.useMemo(() => {
     let count = 0
     if (filters.searchTerm) count++
-    if (filters.siteId) count++
-    if (filters.siteCode) count++
+    if (filters.site) count++
     if (filters.status !== "all") count++
-    if (filters.supplierId) count++
-    if (filters.inciName) count++
+    if (filters.supplier) count++
+    if (filters.inci) count++
+    if (filters.favoriteOnly) count++
     return count
   }, [filters])
+
+  const supplierOptions = React.useMemo(
+    () => uniqueSorted(materials.map((material) => material.supplier)),
+    [materials]
+  )
+  const siteOptions = React.useMemo(
+    () => uniqueSorted(materials.map((material) => material.site)),
+    [materials]
+  )
+  const inciOptions = React.useMemo(
+    () => uniqueSorted(materials.map((material) => material.inci)),
+    [materials]
+  )
+  const statusOptions = React.useMemo(() => Object.keys(statusConfig) as RMStatus[], [])
 
   // Table columns
   const columns = React.useMemo<ColumnDef<RawMaterial>[]>(
@@ -214,7 +237,7 @@ export function RawMaterialsList() {
         ),
       },
       {
-        accessorKey: "siteCode",
+        accessorKey: "code",
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -228,36 +251,32 @@ export function RawMaterialsList() {
         ),
         cell: ({ row }) => (
           <code className="rounded bg-slate-100 px-2 py-1 text-xs font-mono">
-            {row.original.siteCode}
+            {row.original.code}
           </code>
         ),
       },
       {
-        accessorKey: "inciName",
+        accessorKey: "inci",
         header: "INCI",
         cell: ({ row }) => (
-          <span className="text-sm text-slate-600">{row.original.inciName}</span>
+          <span className="text-sm text-slate-600">{row.original.inci}</span>
         ),
       },
       {
-        accessorKey: "supplierId",
+        accessorKey: "supplier",
         header: "Fournisseur",
-        cell: ({ row }) => {
-          const company = mockCompanies.find((c) => c.id === row.original.supplierId)
-          return <span className="text-sm text-slate-600">{company?.name || "—"}</span>
-        },
+        cell: ({ row }) => (
+          <span className="text-sm text-slate-600">{row.original.supplier}</span>
+        ),
       },
       {
-        accessorKey: "siteId",
+        accessorKey: "site",
         header: "Site",
-        cell: ({ row }) => {
-          const site = mockSites.find((s) => s.id === row.original.siteId)
-          return (
-            <Badge variant="outline" className="font-mono text-xs">
-              {site?.code || "—"}
-            </Badge>
-          )
-        },
+        cell: ({ row }) => (
+          <Badge variant="outline" className="font-mono text-xs">
+            {row.original.site}
+          </Badge>
+        ),
       },
       {
         accessorKey: "status",
@@ -313,7 +332,9 @@ export function RawMaterialsList() {
 
   // Handlers
   const handleRowClick = (material: RawMaterial) => {
-    router.push(`/raw-materials/${material.id}`)
+    const queryString = buildQueryFromFilters(filters)
+    const suffix = queryString ? `?q=${encodeURIComponent(queryString)}` : ""
+    router.push(`/raw-materials/${material.id}${suffix}`)
   }
 
   const handleBulkDelete = () => {
@@ -323,7 +344,7 @@ export function RawMaterialsList() {
     // Check for dependencies (simplified)
     const hasReferences = materials
       .filter((m) => selectedIds.includes(m.id))
-      .some((m) => m.status === "active")
+      .some((m) => m.status === "Actif")
 
     if (hasReferences) {
       toast.error("Impossible de supprimer des matières actives. Changez d'abord leur statut.")
@@ -345,11 +366,11 @@ export function RawMaterialsList() {
   const clearFilters = () => {
     setFilters({
       searchTerm: "",
-      siteId: null,
-      siteCode: null,
+      site: null,
       status: "all",
-      supplierId: null,
-      inciName: null,
+      supplier: null,
+      inci: null,
+      favoriteOnly: false,
     })
     setShowFilters(false)
   }
@@ -382,10 +403,13 @@ export function RawMaterialsList() {
                 Fournisseur
               </label>
               <Combobox
-                options={mockCompanies.map((c) => ({ value: c.id, label: c.name }))}
-                value={filters.supplierId || ""}
+                options={supplierOptions.map((supplier) => ({
+                  value: supplier,
+                  label: supplier,
+                }))}
+                value={filters.supplier || ""}
                 onValueChange={(value) =>
-                  setFilters((prev) => ({ ...prev, supplierId: value || null }))
+                  setFilters((prev) => ({ ...prev, supplier: value || null }))
                 }
                 placeholder="Tous"
               />
@@ -396,9 +420,9 @@ export function RawMaterialsList() {
                 Site
               </label>
               <Select
-                value={filters.siteId || "all"}
+                value={filters.site || "all"}
                 onValueChange={(value) =>
-                  setFilters((prev) => ({ ...prev, siteId: value === "all" ? null : value }))
+                  setFilters((prev) => ({ ...prev, site: value === "all" ? null : value }))
                 }
               >
                 <SelectTrigger>
@@ -406,10 +430,9 @@ export function RawMaterialsList() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les sites</SelectItem>
-                  {mockSites.map((site) => (
-                    <SelectItem key={site.id} value={site.id}>
-                      <span className="font-mono text-xs font-semibold">{site.code}</span>
-                      <span className="ml-2 text-slate-600">— {site.name}</span>
+                  {siteOptions.map((site) => (
+                    <SelectItem key={site} value={site}>
+                      <span className="font-mono text-xs font-semibold">{site}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -418,15 +441,15 @@ export function RawMaterialsList() {
 
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-600">
-                Code MP
+                INCI
               </label>
-              <Input
-                placeholder="Rechercher par code..."
-                value={filters.siteCode || ""}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, siteCode: e.target.value || null }))
+              <Combobox
+                options={inciOptions.map((inci) => ({ value: inci, label: inci }))}
+                value={filters.inci || ""}
+                onValueChange={(value) =>
+                  setFilters((prev) => ({ ...prev, inci: value || null }))
                 }
-                className="font-mono text-sm"
+                placeholder="Tous"
               />
             </div>
 
@@ -439,7 +462,7 @@ export function RawMaterialsList() {
                 onValueChange={(value) =>
                   setFilters((prev) => ({
                     ...prev,
-                    status: value as RawMaterialStatus | "all",
+                    status: value as RMStatus | "all",
                   }))
                 }
               >
@@ -448,14 +471,17 @@ export function RawMaterialsList() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les statuts</SelectItem>
-                  {Object.entries(statusConfig).map(([key, config]) => (
-                    <SelectItem key={key} value={key}>
-                      <Badge className={cn("gap-1.5 border text-xs", config.className)}>
-                        <config.icon className="h-3 w-3" />
-                        {config.label}
-                      </Badge>
-                    </SelectItem>
-                  ))}
+                  {statusOptions.map((status) => {
+                    const config = statusConfig[status]
+                    return (
+                      <SelectItem key={status} value={status}>
+                        <Badge className={cn("gap-1.5 border text-xs", config.className)}>
+                          <config.icon className="h-3 w-3" />
+                          {config.label}
+                        </Badge>
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -483,6 +509,18 @@ export function RawMaterialsList() {
               )}
             </Button>
 
+            <Button
+              variant={filters.favoriteOnly ? "default" : "ghost"}
+              size="sm"
+              onClick={() =>
+                setFilters((prev) => ({ ...prev, favoriteOnly: !prev.favoriteOnly }))
+              }
+              className="gap-2"
+            >
+              <Star className="h-4 w-4" />
+              Favoris
+            </Button>
+
             {activeFilterCount > 0 && (
               <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-2">
                 <X className="h-4 w-4" />
@@ -491,12 +529,35 @@ export function RawMaterialsList() {
             )}
 
             {/* Active filter badges */}
-            {filters.siteId && (
+            {filters.site && (
               <Badge variant="outline" className="gap-1.5">
-                Site:{" "}
-                {mockSites.find((s) => s.id === filters.siteId)?.code}
+                Site: {filters.site}
                 <button
-                  onClick={() => setFilters((prev) => ({ ...prev, siteId: null }))}
+                  onClick={() => setFilters((prev) => ({ ...prev, site: null }))}
+                  className="ml-1"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+
+            {filters.supplier && (
+              <Badge variant="outline" className="gap-1.5">
+                Fournisseur: {filters.supplier}
+                <button
+                  onClick={() => setFilters((prev) => ({ ...prev, supplier: null }))}
+                  className="ml-1"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+
+            {filters.inci && (
+              <Badge variant="outline" className="gap-1.5">
+                INCI: {filters.inci}
+                <button
+                  onClick={() => setFilters((prev) => ({ ...prev, inci: null }))}
                   className="ml-1"
                 >
                   <X className="h-3 w-3" />
@@ -506,9 +567,21 @@ export function RawMaterialsList() {
 
             {filters.status !== "all" && (
               <Badge variant="outline" className="gap-1.5">
-                Statut: {statusConfig[filters.status as RawMaterialStatus].label}
+                Statut: {statusConfig[filters.status as RMStatus].label}
                 <button
                   onClick={() => setFilters((prev) => ({ ...prev, status: "all" }))}
+                  className="ml-1"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+
+            {filters.favoriteOnly && (
+              <Badge variant="outline" className="gap-1.5">
+                Favoris seulement
+                <button
+                  onClick={() => setFilters((prev) => ({ ...prev, favoriteOnly: false }))}
                   className="ml-1"
                 >
                   <X className="h-3 w-3" />

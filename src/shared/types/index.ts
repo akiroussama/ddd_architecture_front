@@ -143,8 +143,8 @@ export interface InciEntry {
   name: string
   annexReference?: string
   usMonograph?: string
-  euInventorySource: string
-  usInventorySource: string
+  euInventorySource?: string
+  usInventorySource?: string
   comment?: string
   synonyms?: string[]
   createdAt: string
@@ -191,13 +191,21 @@ export interface SubstanceFormData {
 }
 
 // Raw Materials Module Types
-export type RawMaterialStatus =
-  | "active"
-  | "pending"
-  | "discontinued"
-  | "restricted"
-  | "approved"
-  | "review"
+export type RMStatus =
+  | "Approuvé"
+  | "Actif"
+  | "En attente"
+  | "En revue"
+  | "Restreint"
+  | "Arrêté"
+
+export type CasEcPair = {
+  id: string
+  cas: string
+  ec?: string
+  sources: string[]
+  note?: string
+}
 
 export interface Site {
   id: string
@@ -205,7 +213,7 @@ export interface Site {
   name: string
   location: string
   country: string
-  codePattern: string // e.g., "PAR-{year}-{seq}"
+  codePattern: string
   active: boolean
 }
 
@@ -219,44 +227,66 @@ export interface Company {
   country?: string
 }
 
-export interface RawMaterial {
+export type RawMaterial = {
   id: string
   commercialName: string
-  supplierId: string
-  siteId: string
-  siteCode: string // Site-specific code (e.g., PAR-2024-001)
-  status: RawMaterialStatus
-
-  // INCI & Composition
-  inciName: string
-  inciId?: string // Reference to InciEntry
-  cas?: string
-  einecs?: string
-  percentage?: number
-
-  // Additional Info
-  grade?: string
-  origin?: string
-  batch?: string
-  expiryDate?: string
-  certifications?: string[]
-
-  // Metadata
-  createdAt: string
-  createdBy: string
+  code: string
+  inci: string
+  supplier: string
+  site: string
+  status: RMStatus
   updatedAt: string
-  updatedBy: string
+  documentsCount?: number
+  certificationsCount?: number
+  favorite?: boolean
 
-  // References
+  // Détails
+  originCountry?: string
+  grade?: string
+  lot?: string
+  expirationDate?: string
+  productionSiteName?: string
+
+  // Spécifique
+  casEcPairs: CasEcPair[]
+
+  // Facettes & attributs complémentaires
+  allergens?: string[]
+  ifraCategory?: string
+  risks?: string[]
+  keywords?: string[]
+  lastViewedAt?: string
   documents?: Document[]
   notes?: RegulatoryNote[]
+  allergenStatements?: string[]
+  hazards?: string[]
 }
 
 export interface RawMaterialFilters {
   searchTerm: string
-  siteId: string | null
-  siteCode: string | null
-  status: RawMaterialStatus | "all"
-  supplierId: string | null
-  inciName: string | null
+  site: string | null
+  status: RMStatus | "all"
+  supplier: string | null
+  inci: string | null
+  favoriteOnly?: boolean
+}
+
+export type RawMaterialBookmark = {
+  id: string
+  commercialName: string
+  code: string
+  inci: string
+  supplier: string
+  site: string
+  status: RMStatus
+  updatedAt: string
+  timestamp: string
+}
+
+export type RawMaterialSavedView = {
+  id: string
+  name: string
+  query: string
+  createdAt: string
+  color?: string
 }

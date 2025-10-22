@@ -30,6 +30,13 @@ export function SubstanceDetailView({
   const documents = substance.documents ?? []
   const notes = substance.notes ?? []
 
+  const inciEurope = substance.inciEU?.trim() || ""
+  const inciUSA = substance.inciUS?.trim() || ""
+  const primaryTitle = inciEurope || inciUSA || substance.technicalName || substance.id
+  const titleSuffix = "INCI Europe / INCI USA"
+  const fullTitle = `${primaryTitle} – ${titleSuffix}`
+  const primaryCas = substance.casEinecsPairs?.[0]?.cas?.trim()
+
   const statusConfig = {
     active: { label: "Actif", className: "bg-green-50 text-green-700 border-green-200" },
     archived: { label: "Archivé", className: "bg-gray-50 text-gray-700 border-gray-200" },
@@ -95,7 +102,7 @@ export function SubstanceDetailView({
   }, [restrictions, blacklists, documents, substance.families])
 
   const handleCopy = () => {
-    const text = `${substance.id} - ${substance.inciEU}`
+    const text = `${substance.id} - ${fullTitle}`
     navigator.clipboard?.writeText(text).then(() => {
       toast.success("Référence copiée")
     })
@@ -127,16 +134,13 @@ export function SubstanceDetailView({
               )}
             </div>
             <h1 className="text-3xl font-semibold text-slate-900">
-              {substance.inciEU}
+              {fullTitle}
             </h1>
-            <p className="text-sm text-slate-600">
-              INCI: {substance.inciEU}
-              {substance.inciUS && substance.inciUS !== substance.inciEU && ` • CAS: ${substance.casEinecsPairs?.[0]?.cas || "—"}`}
-            </p>
+            {primaryCas ? (
+              <p className="text-sm text-slate-600">CAS: {primaryCas}</p>
+            ) : null}
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <span>Créé le {formatDate(substance.createdAt, "dd MMM yyyy")}</span>
-              <span className="text-slate-300">•</span>
-              <span>Mis à jour {formatRelativeDate(substance.updatedAt)}</span>
               <span className="text-slate-300">•</span>
               <span>Par {substance.updatedBy}</span>
             </div>

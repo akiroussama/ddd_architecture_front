@@ -14,10 +14,19 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { id } = await params
   const substance = mockSubstances.find((s) => s.id === id)
 
+  if (!substance) {
+    return {
+      title: "Substance non trouvée",
+    }
+  }
+
+  const inciEurope = substance.inciEU?.trim() || ""
+  const inciUSA = substance.inciUS?.trim() || ""
+  const primaryTitle = inciEurope || inciUSA || substance.technicalName || substance.id
+  const titleSuffix = "INCI Europe / INCI USA"
+
   return {
-    title: substance
-      ? `${substance.inciEU} | Substance Manager`
-      : "Substance non trouvée",
+    title: `${primaryTitle} – ${titleSuffix} | Substance Manager`,
   }
 }
 

@@ -36,8 +36,8 @@ const inciFormSchema = z.object({
   name: z.string().min(1, "Le nom INCI est requis"),
   annexReference: z.string().optional(),
   usMonograph: z.string().optional(),
-  euInventorySource: z.string().min(1, "La source inventaire UE est requise"),
-  usInventorySource: z.string().min(1, "La source inventaire US est requise"),
+  euInventorySource: z.string().optional(),
+  usInventorySource: z.string().optional(),
   comment: z.string().optional(),
 })
 
@@ -54,8 +54,8 @@ export function InciDetailView({ entry: initialEntry, onUpdate }: InciDetailView
       name: entry.name,
       annexReference: entry.annexReference || "",
       usMonograph: entry.usMonograph || "",
-      euInventorySource: entry.euInventorySource,
-      usInventorySource: entry.usInventorySource,
+      euInventorySource: entry.euInventorySource || "",
+      usInventorySource: entry.usInventorySource || "",
       comment: entry.comment || "",
     },
   })
@@ -65,8 +65,8 @@ export function InciDetailView({ entry: initialEntry, onUpdate }: InciDetailView
       name: entry.name,
       annexReference: entry.annexReference || "",
       usMonograph: entry.usMonograph || "",
-      euInventorySource: entry.euInventorySource,
-      usInventorySource: entry.usInventorySource,
+      euInventorySource: entry.euInventorySource || "",
+      usInventorySource: entry.usInventorySource || "",
       comment: entry.comment || "",
     })
     setIsEditing(true)
@@ -84,8 +84,8 @@ export function InciDetailView({ entry: initialEntry, onUpdate }: InciDetailView
       name: data.name.trim(),
       annexReference: data.annexReference?.trim() || undefined,
       usMonograph: data.usMonograph?.trim() || undefined,
-      euInventorySource: data.euInventorySource.trim(),
-      usInventorySource: data.usInventorySource.trim(),
+      euInventorySource: data.euInventorySource?.trim() || undefined,
+      usInventorySource: data.usInventorySource?.trim() || undefined,
       comment: data.comment?.trim() || undefined,
       updatedAt: timestamp,
       updatedBy: "Marie Dubois",
@@ -122,10 +122,6 @@ export function InciDetailView({ entry: initialEntry, onUpdate }: InciDetailView
               <h1 className="text-3xl font-bold text-slate-900">{entry.name}</h1>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>ID: {entry.id}</span>
-                <span>•</span>
-                <span>
-                  Mis à jour le {format(new Date(entry.updatedAt), "d MMMM yyyy", { locale: fr })}
-                </span>
               </div>
             </div>
           </div>
@@ -146,7 +142,7 @@ export function InciDetailView({ entry: initialEntry, onUpdate }: InciDetailView
             </CardHeader>
             <CardContent>
               <div className="text-base font-semibold text-slate-900">
-                {entry.euInventorySource}
+                {entry.euInventorySource || "—"}
               </div>
             </CardContent>
           </Card>
@@ -160,7 +156,7 @@ export function InciDetailView({ entry: initialEntry, onUpdate }: InciDetailView
             </CardHeader>
             <CardContent>
               <div className="text-base font-semibold text-slate-900">
-                {entry.usInventorySource}
+                {entry.usInventorySource || "—"}
               </div>
             </CardContent>
           </Card>
@@ -232,7 +228,7 @@ export function InciDetailView({ entry: initialEntry, onUpdate }: InciDetailView
                       Source Inventaire UE
                     </p>
                     <Badge variant="secondary" className="font-mono text-xs">
-                      {entry.euInventorySource}
+                      {entry.euInventorySource || "—"}
                     </Badge>
                   </div>
                   <div className="space-y-1">
@@ -240,7 +236,7 @@ export function InciDetailView({ entry: initialEntry, onUpdate }: InciDetailView
                       Source Inventaire US
                     </p>
                     <Badge variant="secondary" className="font-mono text-xs">
-                      {entry.usInventorySource}
+                      {entry.usInventorySource || "—"}
                     </Badge>
                   </div>
                 </div>
@@ -379,7 +375,7 @@ export function InciDetailView({ entry: initialEntry, onUpdate }: InciDetailView
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="edit-eu-source">Source Inventaire UE *</Label>
+                <Label htmlFor="edit-eu-source">Source Inventaire UE</Label>
                 <Input
                   id="edit-eu-source"
                   {...form.register("euInventorySource")}
@@ -393,7 +389,7 @@ export function InciDetailView({ entry: initialEntry, onUpdate }: InciDetailView
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-us-source">Source Inventaire US *</Label>
+                <Label htmlFor="edit-us-source">Source Inventaire US</Label>
                 <Input
                   id="edit-us-source"
                   {...form.register("usInventorySource")}
