@@ -144,6 +144,20 @@ export function RawMaterialsList() {
     return count
   }, [filters])
 
+  const supplierOptions = React.useMemo(
+    () => uniqueSorted(materials.map((material) => material.supplier)),
+    [materials]
+  )
+  const siteOptions = React.useMemo(
+    () => uniqueSorted(materials.map((material) => material.site)),
+    [materials]
+  )
+  const inciOptions = React.useMemo(
+    () => uniqueSorted(materials.map((material) => material.inci)),
+    [materials]
+  )
+  const statusOptions = React.useMemo(() => Object.keys(statusConfig) as RMStatus[], [])
+
   // Table columns
   const columns = React.useMemo<ColumnDef<RawMaterial>[]>(
     () => [
@@ -186,7 +200,7 @@ export function RawMaterialsList() {
         ),
       },
       {
-        accessorKey: "siteCode",
+        accessorKey: "code",
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -200,36 +214,32 @@ export function RawMaterialsList() {
         ),
         cell: ({ row }) => (
           <code className="rounded bg-slate-100 px-2 py-1 text-xs font-mono">
-            {row.original.siteCode}
+            {row.original.code}
           </code>
         ),
       },
       {
-        accessorKey: "inciName",
+        accessorKey: "inci",
         header: "INCI",
         cell: ({ row }) => (
-          <span className="text-sm text-slate-600">{row.original.inciName}</span>
+          <span className="text-sm text-slate-600">{row.original.inci}</span>
         ),
       },
       {
-        accessorKey: "supplierId",
+        accessorKey: "supplier",
         header: "Fournisseur",
-        cell: ({ row }) => {
-          const company = mockCompanies.find((c) => c.id === row.original.supplierId)
-          return <span className="text-sm text-slate-600">{company?.name || "—"}</span>
-        },
+        cell: ({ row }) => (
+          <span className="text-sm text-slate-600">{row.original.supplier}</span>
+        ),
       },
       {
-        accessorKey: "siteId",
+        accessorKey: "site",
         header: "Site",
-        cell: ({ row }) => {
-          const site = mockSites.find((s) => s.id === row.original.siteId)
-          return (
-            <Badge variant="outline" className="font-mono text-xs">
-              {site?.code || "—"}
-            </Badge>
-          )
-        },
+        cell: ({ row }) => (
+          <Badge variant="outline" className="font-mono text-xs">
+            {row.original.site}
+          </Badge>
+        ),
       },
       {
         accessorKey: "status",
@@ -354,10 +364,13 @@ export function RawMaterialsList() {
                 Fournisseur
               </label>
               <Combobox
-                options={mockCompanies.map((c) => ({ value: c.id, label: c.name }))}
-                value={filters.supplierId || ""}
+                options={supplierOptions.map((supplier) => ({
+                  value: supplier,
+                  label: supplier,
+                }))}
+                value={filters.supplier || ""}
                 onValueChange={(value) =>
-                  setFilters((prev) => ({ ...prev, supplierId: value || null }))
+                  setFilters((prev) => ({ ...prev, supplier: value || null }))
                 }
                 placeholder="Tous"
               />
@@ -368,9 +381,9 @@ export function RawMaterialsList() {
                 Site
               </label>
               <Select
-                value={filters.siteId || "all"}
+                value={filters.site || "all"}
                 onValueChange={(value) =>
-                  setFilters((prev) => ({ ...prev, siteId: value === "all" ? null : value }))
+                  setFilters((prev) => ({ ...prev, site: value === "all" ? null : value }))
                 }
               >
                 <SelectTrigger>
@@ -378,10 +391,9 @@ export function RawMaterialsList() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les sites</SelectItem>
-                  {mockSites.map((site) => (
-                    <SelectItem key={site.id} value={site.id}>
-                      <span className="font-mono text-xs font-semibold">{site.code}</span>
-                      <span className="ml-2 text-slate-600">— {site.name}</span>
+                  {siteOptions.map((site) => (
+                    <SelectItem key={site} value={site}>
+                      <span className="font-mono text-xs font-semibold">{site}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -390,15 +402,15 @@ export function RawMaterialsList() {
 
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-600">
-                Code MP
+                INCI
               </label>
-              <Input
-                placeholder="Rechercher par code..."
-                value={filters.siteCode || ""}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, siteCode: e.target.value || null }))
+              <Combobox
+                options={inciOptions.map((inci) => ({ value: inci, label: inci }))}
+                value={filters.inci || ""}
+                onValueChange={(value) =>
+                  setFilters((prev) => ({ ...prev, inci: value || null }))
                 }
-                className="font-mono text-sm"
+                placeholder="Tous"
               />
             </div>
 
