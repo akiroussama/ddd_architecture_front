@@ -20,6 +20,14 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Raw Materials Module
+
+- Ouvrez `/raw-materials` pour la liste des matières. Les colonnes et filtres dynamiques restent disponibles.
+- Cliquez sur une ligne pour ouvrir la nouvelle vue détail persistante (`/raw-materials/[id]?q=...`) avec la barre transverse Précédent/Suivant.
+- Depuis la vue détail, pressez `⌘K` (ou `Ctrl+K`) pour lancer la palette de recherche, essayer des tokens comme `inci:tocopherol cas:10191-41-0`, et naviguer dans les résultats.
+- Naviguez jusqu’à la section **CAS / EINECS** via la nav latérale (`g`, `c`, `d`, `t`), puis ajoutez/éditez des couplages dans la grille (validation CAS, sources obligatoires).
+- Le switcher propose aussi les vues sauvegardées, récents et favoris (mémorisés en localStorage).
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

@@ -1,299 +1,621 @@
 import type { RawMaterial, RMStatus } from "@/shared/types"
 
-type TokenMap = Record<string, string[]>
+import { getCachedSearch, setCachedSearch } from "@/lib/rm-store"
 
-export type ParsedQuery = {
-  text: string[]
-  tokens: TokenMap
-}
+type FieldKey =
+  | "cas"
+  | "ec"
+  | "inci"
+  | "code"
+  | "supplier"
+  | "site"
+  | "status"
+  | "grade"
+  | "origin"
+  | "favorite"
 
-export type SearchFacets = {
-  status?: RMStatus[]
-  site?: string[]
-  supplier?: string[]
-  originCountry?: string[]
-  grade?: string[]
-  favorite?: boolean
-}
-
-const FIELD_ALIASES: Record<string, string> = {
+const FIELD_ALIASES: Record<string, FieldKey> = {
   cas: "cas",
   einecs: "ec",
   ec: "ec",
   inci: "inci",
   ingredient: "inci",
-  fournisseur: "supplier",
+  code: "code",
+  mp: "code",
   fourn: "supplier",
+  fournisseur: "supplier",
   supplier: "supplier",
   site: "site",
-  favoris: "favorite",
-  favori: "favorite",
-  favorite: "favorite",
-  fav: "favorite",
   statut: "status",
   status: "status",
   state: "status",
-  code: "code",
-  mp: "code",
-  lot: "lot",
-  origine: "originCountry",
-  pays: "originCountry",
+  origine: "origin",
+  origin: "origin",
+  pays: "origin",
   grade: "grade",
+  favorite: "favorite",
+  favoris: "favorite",
 }
 
-const TOKEN_REGEX =
-  /(?:(\w+):(?:"([^"]+)"|([^\s]+)))|(?:"([^"]+)"|([^\s]+))/g
+const FIELD_LABELS: Record<FieldKey, string> = {
+  cas: "CAS",
+  ec: "EINECS",
+  inci: "INCI",
+  code: "Code MP",
+  supplier: "Fournisseur",
+  site: "Site",
+  status: "Statut",
+  grade: "Grade",
+  origin: "Origine",
+  favorite: "Favori",
+}
 
-const whitespaceRegex = /\s+/g
+const SERIALIZE_FIELD_NAMES: Record<FieldKey, string> = {
+  cas: "cas",
+  ec: "ec",
+  inci: "inci",
+  code: "code",
+  supplier: "fourn",
+  site: "site",
+  status: "statut",
+  grade: "grade",
+  origin: "origine",
+  favorite: "favorite",
+}
 
-export function parseQuery(input: string): ParsedQuery {
-  const text: string[] = []
-  const tokens: TokenMap = {}
+export type ParsedToken = {
+  id: string
+  clauseIndex: number
+  type: "text" | "field"
+  field?: FieldKey
+  label: string
+  value: string
+  normalized: string
+  negated: boolean
+  raw: string
+}
 
-  if (!input.trim()) {
-    return { text, tokens }
-  }
+export type ParsedClause = {
+  index: number
+  tokens: ParsedToken[]
+  order: string[]
+  textTerms: string[]
+  negatedTerms: string[]
+  fieldTokens: Record<FieldKey, string[]>
+  negatedFieldTokens: Record<FieldKey, string[]>
+}
 
-  let match: RegExpExecArray | null
-  const clone = input.trim()
+export type ParsedQuery = {
+  raw: string
+  clauses: ParsedClause[]
+  allTokens: ParsedToken[]
+}
 
-  while ((match = TOKEN_REGEX.exec(clone)) !== null) {
-    const [_, field, quotedFieldValue, fieldValue, quotedFree, free] = match
+export type SearchComputation = {
+  matches: RawMaterial[]
+  order: string[]
+}
 
-    if (field) {
-      const normalizedField = FIELD_ALIASES[field.toLowerCase()]
-      const value = (quotedFieldValue ?? fieldValue ?? "").trim()
+type MaskResult = {
+  masked: string
+  replacements: string[]
+}
 
-      if (!value) continue
-
-      if (normalizedField) {
-        tokens[normalizedField] = tokens[normalizedField] ?? []
-        tokens[normalizedField]!.push(value)
-      } else {
-        text.push(value)
-      }
-    } else {
-      const value = (quotedFree ?? free ?? "").trim()
-      if (value) {
-        text.push(value)
-      }
+export function parseQuery(rawQuery: string): ParsedQuery {
+  const sanitized = (rawQuery ?? "").trim()
+  if (!sanitized) {
+    return {
+      raw: "",
+      clauses: [
+        {
+          index: 0,
+          tokens: [],
+          order: [],
+          textTerms: [],
+          negatedTerms: [],
+          fieldTokens: {} as Record<FieldKey, string[]>,
+          negatedFieldTokens: {} as Record<FieldKey, string[]>,
+        },
+      ],
+      allTokens: [],
     }
   }
 
-  return { text, tokens }
+  const { masked, replacements } = maskQuotedSegments(sanitized)
+  const clauseStrings = splitByOr(masked).map((segment) =>
+    restorePlaceholders(segment, replacements)
+  )
+
+  const clauses: ParsedClause[] = []
+  const allTokens: ParsedToken[] = []
+
+  clauseStrings.forEach((clauseString, clauseIndex) => {
+    const clause = parseClause(clauseString, clauseIndex)
+    clauses.push(clause)
+    allTokens.push(...clause.tokens)
+  })
+
+  return {
+    raw: sanitized,
+    clauses,
+    allTokens,
+  }
 }
 
-const CASE_INSENSITIVE_FIELDS = new Set(["cas", "ec", "code"])
+function parseClause(clauseString: string, clauseIndex: number): ParsedClause {
+  const tokens: ParsedToken[] = []
+  const order: string[] = []
+  const fieldTokens: Record<FieldKey, string[]> = Object.create(null)
+  const negatedFieldTokens: Record<FieldKey, string[]> = Object.create(null)
+  const textTerms: string[] = []
+  const negatedTerms: string[] = []
 
-export function applySearch(
-  data: RawMaterial[],
-  parsed: ParsedQuery,
-  facets: SearchFacets = {}
-): RawMaterial[] {
-  if (!data.length) return []
+  let working = clauseString
+  const fieldRegex = /(-?)([a-zA-Z]+):(?:"([^"]*)"|([^\s]+))/g
+  let fieldMatch: RegExpExecArray | null
+  let counter = 0
 
-  return data
-    .map((item) => ({
-      item,
-      score: scoreMaterial(item, parsed, facets),
-    }))
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map((entry) => entry.item)
-}
+  while ((fieldMatch = fieldRegex.exec(clauseString)) !== null) {
+    const [, negPrefix, fieldName, quotedValue, bareValue] = fieldMatch
+    const canonical = FIELD_ALIASES[fieldName.toLowerCase()]
+    const value = (quotedValue ?? bareValue ?? "").trim()
+    if (!value) continue
 
-function scoreMaterial(
-  material: RawMaterial,
-  parsed: ParsedQuery,
-  facets: SearchFacets
-): number {
-  if (!passesFacets(material, facets)) {
-    return 0
-  }
-
-  if (!matchesTokens(material, parsed.tokens)) {
-    return 0
-  }
-
-  const baseScore = parsed.text.reduce((total, query) => {
-    const fieldScores = searchableFields(material).map((value) =>
-      fuzzyScore(value, query)
-    )
-    const best = Math.max(...fieldScores)
-    return best <= 0 ? -Infinity : total + best
-  }, 0)
-
-  if (!Number.isFinite(baseScore)) {
-    return 0
-  }
-
-  const recencyBoost = recencyScore(material.updatedAt)
-  const favoriteBoost = material.favorite ? 15 : 0
-
-  return baseScore + recencyBoost + favoriteBoost
-}
-
-function passesFacets(material: RawMaterial, facets: SearchFacets): boolean {
-  if (facets.status?.length && !facets.status.includes(material.status)) {
-    return false
-  }
-  if (facets.site?.length && !facets.site.includes(material.site)) {
-    return false
-  }
-  if (facets.supplier?.length && !facets.supplier.includes(material.supplier)) {
-    return false
-  }
-  if (
-    facets.originCountry?.length &&
-    (!material.originCountry || !facets.originCountry.includes(material.originCountry))
-  ) {
-    return false
-  }
-  if (
-    facets.grade?.length &&
-    (!material.grade || !facets.grade.includes(material.grade))
-  ) {
-    return false
-  }
-  if (facets.favorite && !material.favorite) {
-    return false
-  }
-  return true
-}
-
-function matchesTokens(material: RawMaterial, tokenMap: TokenMap): boolean {
-  for (const [field, values] of Object.entries(tokenMap)) {
-    const matcher = getFieldMatcher(field)
-    if (!matcher) {
+    if (!canonical) {
       continue
     }
 
-    const matchesAll = values.every((value) => matcher(material, value))
-    if (!matchesAll) {
+    const normalized = normalize(value)
+    const token: ParsedToken = {
+      id: `field-${clauseIndex}-${counter++}`,
+      clauseIndex,
+      type: "field",
+      field: canonical,
+      label: `${FIELD_LABELS[canonical]}: ${value}`,
+      value,
+      normalized,
+      negated: Boolean(negPrefix),
+      raw: fieldMatch[0],
+    }
+    tokens.push(token)
+    order.push(token.id)
+
+    const targetMap = token.negated ? negatedFieldTokens : fieldTokens
+    if (!targetMap[canonical]) {
+      targetMap[canonical] = []
+    }
+    targetMap[canonical]!.push(normalized)
+
+    working = working.replace(fieldMatch[0], " ")
+  }
+
+  const textRegex = /(-?)"([^"]+)"|(-?)([^\s"]+)/g
+  let textMatch: RegExpExecArray | null
+  while ((textMatch = textRegex.exec(working)) !== null) {
+    const negated = Boolean(textMatch[1] ?? textMatch[3])
+    const value = (textMatch[2] ?? textMatch[4] ?? "").trim()
+    if (!value || value === "OR" || value === "or") continue
+    const normalized = normalize(value)
+    const token: ParsedToken = {
+      id: `text-${clauseIndex}-${counter++}`,
+      clauseIndex,
+      type: "text",
+      label: value,
+      value,
+      normalized,
+      negated,
+      raw: textMatch[0],
+    }
+    tokens.push(token)
+    order.push(token.id)
+    if (negated) {
+      negatedTerms.push(normalized)
+    } else {
+      textTerms.push(normalized)
+    }
+  }
+
+  return {
+    index: clauseIndex,
+    tokens,
+    order,
+    textTerms,
+    negatedTerms,
+    fieldTokens,
+    negatedFieldTokens,
+  }
+}
+
+function maskQuotedSegments(input: string): MaskResult {
+  const replacements: string[] = []
+  let masked = input.replace(/"([^"]*)"/g, (_match, value) => {
+    const placeholder = `__Q${replacements.length}__`
+    replacements.push(value)
+    return placeholder
+  })
+  masked = masked.replace(/'([^']*)'/g, (_match, value) => {
+    const placeholder = `__Q${replacements.length}__`
+    replacements.push(value)
+    return placeholder
+  })
+  return { masked, replacements }
+}
+
+function restorePlaceholders(segment: string, replacements: string[]): string {
+  return segment.replace(/__Q(\d+)__/g, (_match, index) => {
+    const replacement = replacements[Number(index)]
+    return `"${replacement}"`
+  })
+}
+
+function splitByOr(masked: string): string[] {
+  if (!masked.includes("OR") && !masked.includes("or")) {
+    return [masked]
+  }
+  const parts: string[] = []
+  let buffer = ""
+  let i = 0
+  const length = masked.length
+  while (i < length) {
+    if (/\s/i.test(masked[i])) {
+      buffer += masked[i]
+      i++
+      continue
+    }
+
+    if (
+      (masked.slice(i, i + 2).toUpperCase() === "OR") &&
+      (i === 0 || /\s/.test(masked[i - 1])) &&
+      (i + 2 === length || /\s/.test(masked[i + 2]))
+    ) {
+      if (buffer.trim()) {
+        parts.push(buffer.trim())
+      }
+      buffer = ""
+      i += 2
+      continue
+    }
+
+    buffer += masked[i]
+    i++
+  }
+
+  if (buffer.trim()) {
+    parts.push(buffer.trim())
+  }
+
+  return parts.length ? parts : [masked]
+}
+
+export function serializeParsedQuery(parsed: ParsedQuery): string {
+  const clauses = parsed.clauses
+    .map((clause) => {
+      if (!clause.tokens.length) return ""
+      const tokens = clause.order
+        .map((tokenId) => clause.tokens.find((token) => token.id === tokenId))
+        .filter((token): token is ParsedToken => Boolean(token))
+      const clauseString = tokens
+        .map((token) => serializeToken(token))
+        .filter(Boolean)
+        .join(" ")
+      return clauseString.trim()
+    })
+    .filter(Boolean)
+
+  return clauses.join(" OR ").trim()
+}
+
+function serializeToken(token: ParsedToken): string {
+  if (token.type === "field" && token.field) {
+    const alias = SERIALIZE_FIELD_NAMES[token.field] ?? token.field
+    const needsQuotes = /\s|:/.test(token.value)
+    const value = needsQuotes ? `"${token.value}"` : token.value
+    return `${token.negated ? "-" : ""}${alias}:${value}`
+  }
+  const needsQuotes = /\s|:/.test(token.value)
+  return `${token.negated ? "-" : ""}${needsQuotes ? `"${token.value}"` : token.value}`
+}
+
+export function removeTokenFromQuery(query: string, tokenId: string): string {
+  const parsed = parseQuery(query)
+  const updatedClauses = parsed.clauses.map((clause) => ({
+    ...clause,
+    tokens: clause.tokens.filter((token) => token.id !== tokenId),
+    order: clause.order.filter((id) => id !== tokenId),
+  }))
+  const filteredClauses = updatedClauses.filter((clause) => clause.tokens.length > 0)
+  const nextParsed: ParsedQuery = {
+    raw: query,
+    clauses: filteredClauses.length ? filteredClauses : updatedClauses.slice(0, 1),
+    allTokens: parsed.allTokens.filter((token) => token.id !== tokenId),
+  }
+  return serializeParsedQuery(nextParsed)
+}
+
+export function applySearch(data: RawMaterial[], parsed: ParsedQuery): SearchComputation {
+  const cacheKey = parsed.raw.trim()
+  const cached = cacheKey ? getCachedSearch(cacheKey) : undefined
+  if (cached) {
+    return {
+      matches: cached.items,
+      order: cached.order,
+    }
+  }
+
+  const results: Array<{ material: RawMaterial; score: number }> = []
+
+  for (const material of data) {
+    let bestScore = Number.NEGATIVE_INFINITY
+
+    for (const clause of parsed.clauses) {
+      const clauseResult = evaluateClause(material, clause)
+      if (clauseResult === null) continue
+      if (clauseResult > bestScore) {
+        bestScore = clauseResult
+      }
+    }
+
+    if (parsed.clauses.length === 0) {
+      const defaultScore = baseScore(material)
+      bestScore = Math.max(bestScore, defaultScore)
+    }
+
+    if (bestScore !== Number.NEGATIVE_INFINITY) {
+      results.push({ material, score: bestScore })
+    }
+  }
+
+  results.sort((a, b) => {
+    if (b.score === a.score) {
+      return a.material.commercialName.localeCompare(b.material.commercialName, "fr")
+    }
+    return b.score - a.score
+  })
+
+  const matches = results.map((entry) => entry.material)
+  const order = matches.map((item) => item.id)
+
+  if (cacheKey) {
+    setCachedSearch(cacheKey, {
+      items: matches,
+      order,
+      queryEcho: cacheKey,
+      timestamp: Date.now(),
+    })
+  }
+
+  return { matches, order }
+}
+
+function evaluateClause(material: RawMaterial, clause: ParsedClause): number | null {
+  let score = 0
+
+  if (!matchesFieldTokens(material, clause.fieldTokens)) {
+    return null
+  }
+  if (!matchesNegatedFieldTokens(material, clause.negatedFieldTokens)) {
+    return null
+  }
+
+  const textScore = scoreText(material, clause.textTerms)
+  if (textScore === null) {
+    return clause.textTerms.length ? null : baseScore(material)
+  }
+  score += textScore
+
+  const negatedText = clause.negatedTerms
+  if (negatedText.length && includesAnyText(material, negatedText)) {
+    return null
+  }
+
+  score += baseScore(material)
+  score += bonusForFields(material, clause.fieldTokens)
+  return score
+}
+
+function matchesFieldTokens(
+  material: RawMaterial,
+  tokens: Record<FieldKey, string[]>
+): boolean {
+  for (const key in tokens) {
+    const field = key as FieldKey
+    const values = tokens[field]!
+    if (!values.length) continue
+
+    const matched = values.some((value) => matchesField(material, field, value))
+    if (!matched) {
       return false
     }
   }
   return true
 }
 
-type FieldMatcher = (material: RawMaterial, value: string) => boolean
+function matchesNegatedFieldTokens(
+  material: RawMaterial,
+  tokens: Record<FieldKey, string[]>
+): boolean {
+  for (const key in tokens) {
+    const field = key as FieldKey
+    const values = tokens[field]!
+    if (!values.length) continue
+    const matched = values.some((value) => matchesField(material, field, value))
+    if (matched) {
+      return false
+    }
+  }
+  return true
+}
 
-function getFieldMatcher(field: string): FieldMatcher | undefined {
-  const normalized = field.toLowerCase()
-
-  const matchers: Record<string, FieldMatcher> = {
-    cas: (material, value) =>
-      material.casEcPairs.some((pair) =>
-        compareField(pair.cas, value, CASE_INSENSITIVE_FIELDS.has("cas"))
-      ),
-    ec: (material, value) =>
-      material.casEcPairs.some(
-        (pair) => pair.ec && compareField(pair.ec, value, CASE_INSENSITIVE_FIELDS.has("ec"))
-      ),
-    inci: (material, value) =>
-      compareField(material.inci, value),
-    supplier: (material, value) =>
-      compareField(material.supplier, value),
-    site: (material, value) => compareField(material.site, value, true),
-    status: (material, value) =>
-      compareField(material.status, value),
-    code: (material, value) =>
-      compareField(material.code, value, true),
-    lot: (material, value) =>
-      material.lot ? compareField(material.lot, value, true) : false,
-    origincountry: (material, value) =>
-      material.originCountry ? compareField(material.originCountry, value) : false,
-    grade: (material, value) =>
-      material.grade ? compareField(material.grade, value) : false,
-    favorite: (material, value) => {
-      const normalizedValue = normalize(value)
-      if (!normalizedValue || normalizedValue === "true" || normalizedValue === "1") {
-        return Boolean(material.favorite)
-      }
-      if (normalizedValue === "false" || normalizedValue === "0") {
+function matchesField(material: RawMaterial, field: FieldKey, value: string): boolean {
+  const target = normalizeFieldValue(material, field)
+  switch (field) {
+    case "cas":
+      return material.casEcPairs.some((pair) => normalize(pair.cas) === value)
+    case "ec":
+      return material.casEcPairs.some(
+        (pair) => pair.ec && normalize(pair.ec) === value
+      )
+    case "favorite":
+      if (value === "false" || value === "0") {
         return !material.favorite
       }
       return Boolean(material.favorite)
-    },
+    default:
+      if (!target) return false
+      if (field === "status" || field === "site") {
+        return target === value
+      }
+      return target.includes(value)
   }
-
-  return matchers[normalized]
 }
 
-function compareField(source: string, query: string, exactOnly = false): boolean {
-  const normalizedSource = normalize(source)
-  const normalizedQuery = normalize(query)
-
-  if (exactOnly) {
-    return normalizedSource === normalizedQuery
+function normalizeFieldValue(material: RawMaterial, field: FieldKey): string | null {
+  switch (field) {
+    case "inci":
+      return normalize(material.inci)
+    case "code":
+      return normalize(material.code)
+    case "supplier":
+      return normalize(material.supplier)
+    case "site":
+      return normalize(material.site)
+    case "status":
+      return normalize(material.status)
+    case "grade":
+      return material.grade ? normalize(material.grade) : null
+    case "origin":
+      return material.originCountry ? normalize(material.originCountry) : null
+    default:
+      return null
   }
-
-  return normalizedSource.includes(normalizedQuery)
 }
 
-function searchableFields(material: RawMaterial): string[] {
-  return [
-    material.commercialName,
-    material.inci,
-    material.code,
-    material.supplier,
-    material.site,
-    material.status,
-    material.originCountry ?? "",
-    material.grade ?? "",
-    ...(material.keywords ?? []),
-  ].filter(Boolean)
-}
-
-function fuzzyScore(value: string, query: string): number {
-  if (!value || !query) return 0
-
-  const normalizedValue = normalize(value)
-  const normalizedQuery = normalize(query)
-
-  if (!normalizedValue || !normalizedQuery) return 0
-
-  if (normalizedValue.includes(normalizedQuery)) {
-    const index = normalizedValue.indexOf(normalizedQuery)
-    return 80 - Math.min(index, 60)
-  }
-
-  const subsequenceScore = subsequence(normalizedValue, normalizedQuery)
-  return subsequenceScore
-}
-
-function subsequence(value: string, query: string): number {
+function scoreText(material: RawMaterial, terms: string[]): number | null {
+  if (!terms.length) return 0
   let score = 0
-  let qi = 0
+  for (const term of terms) {
+    const maxScore = Math.max(
+      fuzzy(normalize(material.commercialName), term),
+      fuzzy(normalize(material.inci), term),
+      fuzzy(normalize(material.code), term),
+      fuzzy(normalize(material.supplier), term),
+      fuzzy(normalize(material.site), term),
+      fuzzy(normalize(material.status), term)
+    )
+    if (maxScore <= 0) {
+      return null
+    }
+    score += maxScore
+  }
+  return score
+}
 
-  for (let vi = 0; vi < value.length && qi < query.length; vi++) {
-    if (value[vi] === query[qi]) {
-      score += 5
-      qi++
-    } else if (vi > 0 && value[vi - 1] === query[qi]) {
-      score += 1
+function includesAnyText(material: RawMaterial, terms: string[]): boolean {
+  const haystacks = [
+    normalize(material.commercialName),
+    normalize(material.inci),
+    normalize(material.code),
+    normalize(material.supplier),
+    normalize(material.site),
+    normalize(material.status),
+  ]
+  return terms.some((term) => haystacks.some((haystack) => haystack.includes(term)))
+}
+
+function baseScore(material: RawMaterial): number {
+  let score = 10
+
+  if (material.favorite) {
+    score += 20
+  }
+
+  const updatedAt = Date.parse(material.updatedAt)
+  if (!Number.isNaN(updatedAt)) {
+    const diffDays = (Date.now() - updatedAt) / (1000 * 60 * 60 * 24)
+    const recencyBoost = Math.max(0, 25 - diffDays / 2)
+    score += recencyBoost
+  }
+
+  return score
+}
+
+function bonusForFields(
+  material: RawMaterial,
+  tokens: Record<FieldKey, string[]>
+): number {
+  let bonus = 0
+
+  if (tokens.cas?.length) {
+    const casValues = material.casEcPairs.map((pair) => normalize(pair.cas))
+    if (tokens.cas.some((value) => casValues.includes(value))) {
+      bonus += 30
     }
   }
-
-  return qi === query.length ? Math.max(10, score) : 0
+  if (tokens.ec?.length) {
+    const ecValues = material.casEcPairs
+      .map((pair) => (pair.ec ? normalize(pair.ec) : null))
+      .filter((value): value is string => Boolean(value))
+    if (tokens.ec.some((value) => ecValues.includes(value))) {
+      bonus += 25
+    }
+  }
+  if (tokens.code?.length) {
+    const code = normalize(material.code)
+    if (tokens.code.includes(code)) {
+      bonus += 35
+    }
+  }
+  if (tokens.status?.length) {
+    const status = normalize(material.status)
+    if (tokens.status.includes(status)) {
+      bonus += 10
+    }
+  }
+  if (tokens.site?.length) {
+    const site = normalize(material.site)
+    if (tokens.site.includes(site)) {
+      bonus += 8
+    }
+  }
+  return bonus
 }
 
-function recencyScore(dateIso: string): number {
-  const date = Date.parse(dateIso)
-  if (Number.isNaN(date)) return 0
+function fuzzy(source: string, query: string): number {
+  if (!source || !query) return 0
+  if (source === query) return 90
+  if (source.includes(query)) {
+    const index = source.indexOf(query)
+    return 70 - Math.min(index, 40)
+  }
 
-  const diffDays = (Date.now() - date) / (1000 * 60 * 60 * 24)
-  if (diffDays <= 0) return 20
-  if (diffDays > 180) return 0
+  let score = 0
+  let sourceIndex = 0
+  let queryIndex = 0
 
-  return Math.max(0, 20 - diffDays / 3)
+  while (sourceIndex < source.length && queryIndex < query.length) {
+    if (source[sourceIndex] === query[queryIndex]) {
+      score += 5
+      queryIndex++
+    } else if (
+      sourceIndex > 0 &&
+      source[sourceIndex - 1] === query[queryIndex]
+    ) {
+      score += 1
+    }
+    sourceIndex++
+  }
+
+  return queryIndex === query.length ? Math.max(15, score) : 0
 }
 
-function normalize(value: string): string {
-  return value
+function normalize(input: string): string {
+  return input
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
-    .replace(whitespaceRegex, " ")
     .trim()
     .toLowerCase()
+}
+
+export function formatStatusLabel(status: RMStatus): string {
+  return status
 }

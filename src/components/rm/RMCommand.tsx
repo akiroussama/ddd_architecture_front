@@ -1,43 +1,54 @@
 "use client"
 
 import * as React from "react"
-import { useId } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowUpRight,
+  Clock,
   Filter,
   Loader2,
   Save,
   Search,
   Sparkles,
   Star,
+  Trash2,
+  X,
 } from "lucide-react"
-import { toast } from "sonner"
 
-import type { RawMaterial } from "@/shared/types"
-import { Dialog, DialogContent } from "@/shared/ui/dialog"
+import { RMQueryPills } from "@/components/rm/RMQueryPills"
+import type {
+  ParsedQuery,
+  ParsedToken,
+} from "@/lib/rm-search"
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/shared/ui/command"
+  parseQuery,
+  serializeParsedQuery,
+  removeTokenFromQuery,
+} from "@/lib/rm-search"
+import {
+  analytics,
+  listRawMaterials,
+  recordRecent,
+} from "@/lib/rm-store"
+import type {
+  RawMaterial,
+  RawMaterialBookmark,
+  RawMaterialSavedView,
+} from "@/shared/types"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
-import { ScrollArea } from "@/shared/ui/scroll-area"
+import { Command, CommandInput } from "@/shared/ui/command"
+import { Dialog, DialogContent } from "@/shared/ui/dialog"
 import { Separator } from "@/shared/ui/separator"
-import { cn } from "@/shared/lib/utils"
-import type { RMHistoryEntry } from "@/components/rm/RMTopBar"
+import { ScrollArea } from "@/shared/ui/scroll-area"
+import { cn, formatRelativeDate } from "@/shared/lib/utils"
 
-export type RMCommandSavedView = {
-  id: string
-  name: string
-  query: string
-  description?: string
-}
+type CommandEntry =
+  | { kind: "recent"; item: RawMaterialBookmark }
+  | { kind: "favorite"; item: RawMaterialBookmark }
+  | { kind: "result"; item: RawMaterial; index: number }
 
-type SelectedFacets = {
+type SelectedFacet = {
   status: string[]
   site: string[]
   supplier: string[]
@@ -50,416 +61,831 @@ type RMCommandProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   query: string
-  initialItems?: RawMaterial[]
-  onSelect: (material: RawMaterial, options?: { newTab?: boolean; query?: string }) => void
-  savedViews: RMCommandSavedView[]
-  onApplyView: (view: RMCommandSavedView) => void
-  onSaveView: (view: RMCommandSavedView) => void
-  favorites: RMHistoryEntry[]
-  recents: RMHistoryEntry[]
-  runSearch: (
-    query: string,
-    facets?: URLSearchParams | Record<string, string | string[] | undefined>
-  ) => Promise<{ items: RawMaterial[]; order: string[]; total: number; query: string }>
+  initialResults: RawMaterial[]
+  initialOrder: string[]
+  recents: RawMaterialBookmark[]
+  favorites: RawMaterialBookmark[]
+  views: RawMaterialSavedView[]
+  density: "comfortable" | "compact"
+  onNavigateMaterial: (
+    material: RawMaterial,
+    meta: { query: string; order: string[]; newTab?: boolean }
+  ) => void
+  onNavigateBookmark: (
+    bookmark: RawMaterialBookmark,
+    source: "recent" | "favorite",
+    meta: { query: string; newTab?: boolean }
+  ) => void
+  onRemoveRecent: (id: string) => void
+  onSaveView: (name: string, query: string) => void
+  onApplyView: (view: RawMaterialSavedView) => void
+  onDeleteView: (id: string) => void
+  onToggleFavorite: (id: string, next?: boolean) => void
+  onQueryChange: (query: string, order: string[], results: RawMaterial[]) => void
+  onPeek: (material: RawMaterial | null) => void
+  onRefreshBookmarks: () => void
 }
 
-const INITIAL_FACETS: SelectedFacets = {
-  status: [],
-  site: [],
-  supplier: [],
-  origin: [],
-  grade: [],
-  favorite: false,
-}
-
-const STATUS_CHIPS = [
-  "Approuvé",
-  "Actif",
-  "En attente",
-  "En revue",
-  "Restreint",
-  "Arrêté",
-]
-
-const FACET_LABELS: Record<keyof SelectedFacets, string> = {
-  status: "Statut",
-  site: "Site",
-  supplier: "Fournisseur",
-  origin: "Pays d’origine",
-  grade: "Grade",
-  favorite: "Favoris",
-}
+const DEBOUNCE_MS = 160
+const ITEM_HEIGHT_COMFORT = 60
+const ITEM_HEIGHT_COMPACT = 48
+const OVERSCAN = 6
 
 export function RMCommand({
   open,
   onOpenChange,
   query,
-  initialItems = [],
-  onSelect,
-  savedViews,
-  onApplyView,
-  onSaveView,
-  favorites,
+  initialResults,
+  initialOrder,
   recents,
-  runSearch,
+  favorites,
+  views,
+  density,
+  onNavigateMaterial,
+  onNavigateBookmark,
+  onRemoveRecent,
+  onSaveView,
+  onApplyView,
+  onDeleteView,
+  onToggleFavorite,
+  onQueryChange,
+  onPeek,
+  onRefreshBookmarks,
 }: RMCommandProps) {
-  const [inputValue, setInputValue] = React.useState(query)
-  const [selectedFacets, setSelectedFacets] = React.useState<SelectedFacets>(INITIAL_FACETS)
-  const [results, setResults] = React.useState<RawMaterial[]>(initialItems)
-  const [order, setOrder] = React.useState<string[]>([])
-  const [total, setTotal] = React.useState<number>(initialItems.length)
-  const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-  const [activeId, setActiveId] = React.useState<string | null>(initialItems[0]?.id ?? null)
-  const [hasLoadedOnce, setHasLoadedOnce] = React.useState(false)
+  const [inputValue, setInputValue] = useState(query)
+  const [results, setResults] = useState<RawMaterial[]>(initialResults)
+  const [order, setOrder] = useState<string[]>(initialOrder)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [highlightIndex, setHighlightIndex] = useState(0)
+  const [peekedId, setPeekedId] = useState<string | null>(null)
+  const [scrollOffset, setScrollOffset] = useState(0)
+  const [viewportHeight, setViewportHeight] = useState(320)
+  const listRef = useRef<HTMLDivElement>(null)
+  const lastQueryRef = useRef(query)
 
-  const liveRegionId = useId()
+  const dataset = useMemo(() => listRawMaterials(), [])
+  const parsedQuery = useMemo<ParsedQuery>(() => parseQuery(inputValue), [inputValue])
+  const positiveTokens = useMemo<ParsedToken[]>(
+    () => parsedQuery.allTokens.filter((token) => !token.negated),
+    [parsedQuery]
+  )
 
-  React.useEffect(() => {
+  const facetOptions = useMemo(() => buildFacetOptions(dataset), [dataset])
+  const [selectedFacets, setSelectedFacets] = useState<SelectedFacet>({
+    status: [],
+    site: [],
+    supplier: [],
+    origin: [],
+    grade: [],
+    favorite: false,
+  })
+
+  const recentsShown = useMemo(
+    () => recents.slice(0, 5),
+    [recents]
+  )
+  const favoritesShown = useMemo(
+    () => favorites.slice(0, 10),
+    [favorites]
+  )
+
+  const resultBaseIndex = recentsShown.length + favoritesShown.length
+  const entries: CommandEntry[] = useMemo(() => {
+    const recentsEntries: CommandEntry[] = recentsShown.map((item) => ({
+      kind: "recent",
+      item,
+    }))
+    const favoriteEntries: CommandEntry[] = favoritesShown.map((item) => ({
+      kind: "favorite",
+      item,
+    }))
+    const resultEntries: CommandEntry[] = results.map((item, idx) => ({
+      kind: "result",
+      item,
+      index: idx,
+    }))
+    return [...recentsEntries, ...favoriteEntries, ...resultEntries]
+  }, [recentsShown, favoritesShown, results])
+
+  const itemHeight = density === "compact" ? ITEM_HEIGHT_COMPACT : ITEM_HEIGHT_COMFORT
+  const totalResultsHeight = results.length * itemHeight
+  const startIndex = Math.max(0, Math.floor(scrollOffset / itemHeight) - OVERSCAN)
+  const endIndex = Math.min(
+    results.length,
+    Math.ceil((scrollOffset + viewportHeight) / itemHeight) + OVERSCAN
+  )
+  const visibleResults = results.slice(startIndex, endIndex)
+  const translateY = startIndex * itemHeight
+
+  useEffect(() => {
     if (open) {
       setInputValue(query)
-      setSelectedFacets(INITIAL_FACETS)
-      if (results.length === 0) {
-        setActiveId(null)
-      }
+      setResults(initialResults)
+      setOrder(initialOrder)
+      lastQueryRef.current = query
+      setHighlightIndex(0)
+      setPeekedId(null)
+      onPeek(null)
+      analytics("open_palette", { query })
     }
-  }, [open, query])
+  }, [open, query, initialOrder, initialResults, onPeek])
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!open) return
     const controller = new AbortController()
-    setLoading(true)
-    setError(null)
-
-    const timeout = window.setTimeout(() => {
-      const params = facetsToParams(selectedFacets)
-      runSearch(inputValue, params)
-        .then((payload) => {
-          setResults(payload.items)
-          setOrder(payload.order)
-          setTotal(payload.total)
-          setHasLoadedOnce(true)
-          if (payload.items.length) {
-            setActiveId((prev) => prev ?? payload.items[0].id)
-          } else {
-            setActiveId(null)
-          }
-        })
-        .catch((err) => {
-          console.error(err)
-          setError(err instanceof Error ? err.message : "Erreur lors de la recherche")
-        })
-        .finally(() => setLoading(false))
-    }, 220)
+    const timeout = window.setTimeout(async () => {
+      const nextQuery = inputValue.trim()
+      if (nextQuery === lastQueryRef.current) return
+      setLoading(true)
+      try {
+        const response = await fetch(
+          `/api/raw-materials/search?q=${encodeURIComponent(nextQuery)}`,
+          { signal: controller.signal, cache: "no-store" }
+        )
+        if (!response.ok) {
+          throw new Error("Impossible d'exécuter la recherche")
+        }
+        const payload = (await response.json()) as {
+          items: RawMaterial[]
+          order: string[]
+          queryEcho: string
+        }
+        setResults(payload.items)
+        setOrder(payload.order)
+        onQueryChange(nextQuery, payload.order, payload.items)
+        lastQueryRef.current = payload.queryEcho
+        setHighlightIndex(0)
+        setScrollOffset(0)
+        setError(null)
+        analytics("execute_query", { query: payload.queryEcho, hits: payload.items.length })
+      } catch (err) {
+        if (controller.signal.aborted) return
+        const message =
+          err instanceof Error ? err.message : "Erreur inconnue lors de la recherche."
+        setError(message)
+      } finally {
+        setLoading(false)
+      }
+    }, DEBOUNCE_MS)
 
     return () => {
       controller.abort()
       window.clearTimeout(timeout)
     }
-  }, [inputValue, open, runSearch, selectedFacets])
+  }, [inputValue, open, onQueryChange])
 
-  const facetOptions = React.useMemo(() => buildFacetOptions(results, initialItems), [
-    initialItems,
-    results,
-  ])
-
-  const activeMaterial = React.useMemo(() => {
-    if (!activeId) return null
-    return results.find((item) => item.id === activeId) ?? null
-  }, [activeId, results])
-
-  const handleSelect = React.useCallback(
-    (material: RawMaterial, options?: { newTab?: boolean }) => {
-      onSelect(material, { newTab: options?.newTab, query: inputValue })
-      if (!options?.newTab) {
-        onOpenChange(false)
+  useEffect(() => {
+    const element = listRef.current
+    if (!element) return
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setViewportHeight(entry.contentRect.height)
       }
-    },
-    [inputValue, onOpenChange, onSelect]
-  )
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
 
-  const handleSaveView = React.useCallback(() => {
-    const name = window.prompt("Nom de la vue à enregistrer :", inputValue || "Nouvelle vue")
-    if (!name) return
-    const saved: RMCommandSavedView = {
-      id: `view-${Date.now()}`,
-      name,
-      query: inputValue,
-      description: `Vue sauvegardée le ${new Date().toLocaleDateString()}`,
+  useEffect(() => {
+    if (!open) return
+    if (highlightIndex >= entries.length) {
+      setHighlightIndex(entries.length ? entries.length - 1 : 0)
     }
-    onSaveView(saved)
-  }, [inputValue, onSaveView])
+  }, [entries.length, highlightIndex, open])
+
+  const highlightedEntry = entries[highlightIndex] ?? null
+
+  useEffect(() => {
+    if (!highlightedEntry || highlightedEntry.kind !== "result") return
+    const index = highlightedEntry.index
+    const top = index * itemHeight
+    const bottom = top + itemHeight
+    if (!listRef.current) return
+    if (top < scrollOffset) {
+      listRef.current.scrollTo({ top, behavior: "smooth" })
+    } else if (bottom > scrollOffset + viewportHeight) {
+      listRef.current.scrollTo({
+        top: bottom - viewportHeight,
+        behavior: "smooth",
+      })
+    }
+  }, [highlightedEntry, itemHeight, scrollOffset, viewportHeight])
+
+  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    setScrollOffset(event.currentTarget.scrollTop)
+  }
+
+  const handleSelectEntry = (
+    entry: CommandEntry,
+    options: { newTab?: boolean }
+  ) => {
+    if (entry.kind === "result") {
+      recordRecent(entry.item)
+      onNavigateMaterial(entry.item, {
+        query: inputValue.trim(),
+        order,
+        newTab: options.newTab,
+      })
+    } else {
+      onNavigateBookmark(entry.item, entry.kind, {
+        query: inputValue.trim(),
+        newTab: options.newTab,
+      })
+    }
+    onOpenChange(false)
+    onPeek(null)
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!entries.length) return
+    if (event.key === "ArrowDown") {
+      event.preventDefault()
+      setHighlightIndex((previous) => Math.min(entries.length - 1, previous + 1))
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault()
+      setHighlightIndex((previous) => Math.max(0, previous - 1))
+    } else if (event.key === "Enter") {
+      event.preventDefault()
+      const entry = entries[highlightIndex]
+      if (!entry) return
+      handleSelectEntry(entry, {
+        newTab: event.metaKey || event.ctrlKey,
+      })
+    } else if (event.key === " " && highlightedEntry?.kind === "result") {
+      event.preventDefault()
+      if (peekedId === highlightedEntry.item.id) {
+        setPeekedId(null)
+        onPeek(null)
+      } else {
+        setPeekedId(highlightedEntry.item.id)
+        onPeek(highlightedEntry.item)
+      }
+    } else if (event.key === "Escape") {
+      event.preventDefault()
+      onOpenChange(false)
+      onPeek(null)
+    } else if (
+      (event.key === "Backspace" || event.key === "Delete") &&
+      highlightedEntry?.kind === "recent" &&
+      inputValue.trim() === ""
+    ) {
+      event.preventDefault()
+      onRemoveRecent(highlightedEntry.item.id)
+      analytics("remove_recent", { id: highlightedEntry.item.id })
+    }
+  }
+
+  const handleFacetToggle = (field: keyof SelectedFacet, value: string) => {
+    setSelectedFacets((previous) => {
+      if (field === "favorite") {
+        const next = { ...previous, favorite: !previous.favorite }
+        updateQueryForFacet("favorite", next.favorite ? "true" : undefined)
+        return next
+      }
+      const list = new Set(previous[field])
+      if (list.has(value)) {
+        list.delete(value)
+      } else {
+        list.add(value)
+      }
+      const next = { ...previous, [field]: Array.from(list) }
+      updateQueryForFacet(field, list)
+      return next
+    })
+  }
+
+  const updateQueryForFacet = (
+    field: keyof SelectedFacet,
+    values?: Set<string> | string | undefined
+  ) => {
+    const baseQuery = parseQuery(inputValue)
+    const remainingTokens = baseQuery.clauses.flatMap((clause) =>
+      clause.tokens.filter(
+        (token) =>
+          token.type !== "field" ||
+          !token.field ||
+          token.field !== mapFacetField(field)
+      )
+    )
+    let rebuilt = remainingTokens
+      .map((token) => serializeTokenStandalone(token))
+      .filter(Boolean)
+      .join(" ")
+    const canonical = mapFacetField(field)
+
+    if (field === "favorite" && typeof values === "string") {
+      if (values === "true") {
+        rebuilt = `${rebuilt} favorite:true`.trim()
+      }
+    } else if (values instanceof Set) {
+      values.forEach((value) => {
+        rebuilt = `${rebuilt} ${canonical}:${quoteIfNeeded(value)}`.trim()
+      })
+    }
+
+    setInputValue(rebuilt)
+  }
+
+  const handleRemoveToken = (tokenId: string) => {
+    const nextQuery = removeTokenFromQuery(inputValue, tokenId)
+    setInputValue(nextQuery)
+    analytics("remove_query_token", { tokenId })
+  }
+
+  const handleSaveCurrentView = () => {
+    const alias = window.prompt("Nom de la vue :", inputValue || "Nouvelle vue")
+    if (!alias) return
+    onSaveView(alias, inputValue.trim())
+    analytics("save_view_palette", { name: alias })
+  }
+
+  const handleApplyView = (view: RawMaterialSavedView) => {
+    onApplyView(view)
+    setInputValue(view.query)
+    analytics("open_view_palette", { id: view.id })
+  }
+
+  const statsLabel =
+    results.length === 0
+      ? "Aucun résultat"
+      : results.length === 1
+        ? "1 résultat"
+        : `${results.length} résultats`
+
+  const removeRecentAndRefresh = (bookmark: RawMaterialBookmark) => {
+    onRemoveRecent(bookmark.id)
+    onRefreshBookmarks()
+  }
+
+  const toggleFavoriteAndRefresh = (bookmark: RawMaterialBookmark) => {
+    onToggleFavorite(bookmark.id)
+    onRefreshBookmarks()
+  }
+
+  const highlightedMaterial =
+    highlightedEntry?.kind === "result" ? highlightedEntry.item : null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl overflow-hidden border border-border p-0">
-        <div className="flex min-h-[520px] flex-col md:flex-row">
+        <div className="flex min-h-[540px] flex-col md:flex-row">
           <div className="flex flex-1 flex-col border-b border-border md:border-b-0 md:border-r">
             <div className="px-4 pb-2 pt-4">
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Search className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Palette matières premières
-                  </span>
+                <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
+                  <Search className="h-4 w-4" />
+                  Palette matières premières
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => setSelectedFacets(INITIAL_FACETS)}
-                    disabled={
-                      !selectedFacets.favorite &&
-                      !selectedFacets.grade.length &&
-                      !selectedFacets.origin.length &&
-                      !selectedFacets.site.length &&
-                      !selectedFacets.status.length &&
-                      !selectedFacets.supplier.length
-                    }
+                    onClick={() => setInputValue(query)}
+                    disabled={inputValue.trim() === query.trim()}
                   >
                     <Filter className="mr-2 h-3.5 w-3.5" />
                     Réinitialiser
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={handleSaveView}>
+                  <Button size="sm" variant="ghost" onClick={handleSaveCurrentView}>
                     <Save className="mr-2 h-3.5 w-3.5" />
-                    Enregistrer
+                    Sauvegarder
                   </Button>
                 </div>
               </div>
-              <Command className="mt-3 rounded-md border border-border">
+              <Command shouldFilter={false} className="mt-3 rounded-md border border-border">
                 <CommandInput
                   value={inputValue}
                   onValueChange={setInputValue}
-                  placeholder='Ex: inci:tocopherol cas:10191-41-0 fournisseur:"BASF"'
-                  aria-describedby={liveRegionId}
+                  placeholder='Ex: inci:tocopherol cas:10191-41-0 fourn:"BASF"'
                 />
               </Command>
+              <RMQueryPills tokens={positiveTokens} onRemoveToken={handleRemoveToken} />
               <FacetBar
-                selected={selectedFacets}
+                facets={selectedFacets}
                 options={facetOptions}
-                onChange={setSelectedFacets}
+                onToggle={handleFacetToggle}
               />
-              <div
-                id={liveRegionId}
-                className="sr-only"
-                aria-live="polite"
-              >{`${loading ? "Recherche en cours" : `${total} résultat(s)`}`}</div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Vues
+                </span>
+                {views.length === 0 ? (
+                  <span className="text-[11px] text-muted-foreground">
+                    Aucune vue enregistrée.
+                  </span>
+                ) : (
+                  views.slice(0, 6).map((view) => (
+                    <Badge
+                      key={view.id}
+                      variant="secondary"
+                      className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px]"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleApplyView(view)}
+                        className="max-w-[140px] truncate text-left"
+                      >
+                        {view.name}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteView(view.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                        aria-label={`Supprimer la vue ${view.name}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))
+                )}
+              </div>
+              <div className="sr-only" aria-live="polite">
+                {loading ? "Recherche en cours" : statsLabel}
+              </div>
             </div>
-
             <Separator />
             <div className="flex flex-1">
               <Command shouldFilter={false} className="flex-1 overflow-hidden">
-                <CommandList className="max-h-[360px]">
-                  {loading ? (
-                    <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Recherche en cours…
-                    </div>
-                  ) : null}
-                  <CommandGroup heading="Vues enregistrées">
-                    {savedViews.map((view) => (
-                      <CommandItem
-                        key={view.id}
-                        onSelect={() => onApplyView(view)}
-                        className="flex items-center justify-between pr-6"
-                      >
-                        <span className="flex items-center gap-2">
-                          <Sparkles className="h-4 w-4 text-purple-500" />
-                          {view.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground">{view.description}</span>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                  <CommandGroup heading="Favoris">
-                    {favorites.length ? (
-                      favorites.map((entry) => (
-                        <CommandItem
-                          key={`fav-${entry.id}`}
-                          onSelect={() =>
-                            onSelectFromHistory(entry, onSelect, onOpenChange, inputValue)
-                          }
-                        >
-                          <span className="mr-2 inline-flex items-center justify-center">
-                            <Star className="h-4 w-4 text-yellow-500" />
-                          </span>
-                          <div className="flex flex-1 flex-col gap-1">
-                            <span className="text-sm font-medium">{entry.commercialName}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {entry.inci} · {entry.site}
-                            </span>
-                          </div>
-                        </CommandItem>
-                      ))
-                    ) : (
-                      <div className="px-4 py-2 text-xs text-muted-foreground">
-                        Ajoutez des favoris pour les voir ici.
-                      </div>
-                    )}
-                  </CommandGroup>
-                  <CommandGroup heading="Récents">
-                    {recents.length ? (
-                      recents.map((entry) => (
-                        <CommandItem
-                          key={`recent-${entry.id}`}
-                          onSelect={() =>
-                            onSelectFromHistory(entry, onSelect, onOpenChange, inputValue)
-                          }
-                        >
-                          <div className="flex flex-1 flex-col gap-1">
-                            <span className="text-sm font-medium">{entry.commercialName}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {entry.inci} · {entry.site}
-                            </span>
-                          </div>
-                        </CommandItem>
-                      ))
-                    ) : (
-                      <div className="px-4 py-2 text-xs text-muted-foreground">
-                        Pas encore de matière consultée.
-                      </div>
-                    )}
-                  </CommandGroup>
-                  <Separator />
-                  <CommandGroup heading="Résultats">
-                    {results.map((material) => {
-                      const isActive = material.id === activeId
-                      return (
-                        <CommandItem
-                          key={material.id}
-                          onSelect={() => handleSelect(material)}
-                          onPointerMove={() => setActiveId(material.id)}
-                          onFocus={() => setActiveId(material.id)}
-                          data-active={isActive ? "true" : undefined}
-                          className={cn(
-                            "flex items-center gap-3 pr-6",
-                            isActive && "bg-muted"
-                          )}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                              event.preventDefault()
-                              handleSelect(material, { newTab: true })
-                            }
-                          }}
-                        >
-                          <div className="flex flex-1 flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-foreground">
-                                {material.commercialName}
-                              </span>
-                              <Badge variant="outline" className="text-[10px]">
-                                {material.site}
-                              </Badge>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                              <span>{material.inci}</span>
-                              <span>· {material.supplier}</span>
-                              <span>· {material.status}</span>
-                              {material.casEcPairs.slice(0, 2).map((pair) => (
-                                <Badge key={pair.id} variant="secondary" className="text-[10px]">
-                                  {pair.cas}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                          <ArrowUpRight className="h-4 w-4 opacity-50" />
-                        </CommandItem>
+                <div
+                  ref={listRef}
+                  onScroll={handleScroll}
+                  onKeyDown={handleKeyDown}
+                  tabIndex={0}
+                  className="max-h-[360px] flex-1 overflow-auto focus-visible:outline-none"
+                >
+                  <div className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Récents
+                  </div>
+                  <ScrollSection
+                    entries={recentsShown.map((item) => ({
+                      kind: "recent" as const,
+                      item,
+                    }))}
+                    highlightIndex={highlightIndex}
+                    baseIndex={0}
+                    onClick={(bookmark) =>
+                      handleSelectEntry(
+                        { kind: "recent", item: bookmark },
+                        { newTab: false }
                       )
-                    })}
-                  </CommandGroup>
-                </CommandList>
-                {error && (
+                    }
+                    onRemove={removeRecentAndRefresh}
+                  />
+                  <div className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Favoris
+                  </div>
+                  <ScrollSection
+                    entries={favoritesShown.map((item) => ({
+                      kind: "favorite" as const,
+                      item,
+                    }))}
+                    highlightIndex={highlightIndex}
+                    baseIndex={recentsShown.length}
+                    onClick={(bookmark) =>
+                      handleSelectEntry(
+                        { kind: "favorite", item: bookmark },
+                        { newTab: false }
+                      )
+                    }
+                    onFavoriteToggle={toggleFavoriteAndRefresh}
+                  />
+                  <div className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Résultats
+                  </div>
+                  <div
+                    className="relative"
+                    style={{ height: totalResultsHeight }}
+                    role="listbox"
+                    aria-activedescendant={highlightedMaterial?.id ?? undefined}
+                  >
+                    <div
+                      className="absolute inset-x-0"
+                      style={{ transform: `translateY(${translateY}px)` }}
+                    >
+                      {visibleResults.map((material, idx) => {
+                        const globalIndex = resultBaseIndex + startIndex + idx
+                        const isActive = highlightIndex === globalIndex
+                        return (
+                          <ResultRow
+                            key={material.id}
+                            material={material}
+                            isActive={isActive}
+                            height={itemHeight}
+                            onClick={() =>
+                              handleSelectEntry(
+                                { kind: "result", item: material, index: startIndex + idx },
+                                { newTab: false }
+                              )
+                            }
+                          />
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+                {error ? (
                   <div className="border-t border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                     {error}
                   </div>
-                )}
-                {!loading && hasLoadedOnce && !results.length && !error ? (
-                  <CommandEmpty>Aucun résultat correspondant à votre requête.</CommandEmpty>
                 ) : null}
+                {loading ? (
+                  <div className="border-t border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+                    <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                    Recherche en cours…
+                  </div>
+                ) : (
+                  <div className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+                    {statsLabel}
+                  </div>
+                )}
               </Command>
             </div>
           </div>
-
-          <div className="hidden w-[300px] flex-col md:flex">
-            <div className="flex-1 overflow-hidden px-4 py-4">
-              <ScrollArea className="h-full pr-2">
-                {activeMaterial ? (
-                  <PreviewCard material={activeMaterial} />
-                ) : (
-                  <div className="flex h-full flex-col items-center justify-center text-center text-sm text-muted-foreground">
-                    <Sparkles className="mb-2 h-6 w-6" />
-                    Sélectionnez une matière pour afficher son aperçu détaillé.
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
-          </div>
+          <aside className="hidden w-[300px] flex-none border-l border-border bg-muted/30 md:block">
+            <PreviewPane material={highlightedMaterial} />
+          </aside>
         </div>
       </DialogContent>
     </Dialog>
   )
 }
 
-type FacetBarProps = {
-  selected: SelectedFacets
-  options: FacetOptions
-  onChange: (facets: SelectedFacets) => void
+type ScrollSectionProps = {
+  entries: Array<{ kind: "recent" | "favorite"; item: RawMaterialBookmark }>
+  highlightIndex: number
+  baseIndex: number
+  onClick: (bookmark: RawMaterialBookmark) => void
+  onRemove?: (bookmark: RawMaterialBookmark) => void
+  onFavoriteToggle?: (bookmark: RawMaterialBookmark) => void
 }
 
-function FacetBar({ selected, options, onChange }: FacetBarProps) {
-  const toggle = (key: keyof SelectedFacets, value: string) => {
-    if (key === "favorite") {
-      onChange({ ...selected, favorite: !selected.favorite })
-      return
-    }
+function ScrollSection({
+  entries,
+  highlightIndex,
+  baseIndex,
+  onClick,
+  onRemove,
+  onFavoriteToggle,
+}: ScrollSectionProps) {
+  if (!entries.length) {
+    return (
+      <div className="px-4 py-3 text-xs text-muted-foreground">
+        Aucun élément pour le moment.
+      </div>
+    )
+  }
+  return (
+    <ul className="px-2 pb-2">
+      {entries.map((entry, idx) => {
+        const bookmark = entry.item
+        const globalIndex = baseIndex + idx
+        const isActive = globalIndex === highlightIndex
+        return (
+          <li key={`${entry.kind}-${bookmark.id}`}>
+            <button
+              type="button"
+              onClick={() => onClick(bookmark)}
+              className={cn(
+                "flex w-full flex-col gap-1 rounded-md px-2 py-2 text-left transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                isActive && "bg-muted"
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-foreground">
+                  {bookmark.commercialName}
+                </span>
+                <Badge variant="outline" className="text-[10px] font-mono">
+                  {bookmark.site}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{bookmark.inci}</span>
+                <span>· {bookmark.status}</span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <ClockIcon />
+                {formatRelativeDate(bookmark.timestamp)}
+              </div>
+            </button>
+            <div className="px-2 pb-2 text-right">
+              {onFavoriteToggle ? (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => onFavoriteToggle(bookmark)}
+                >
+                  <Star className="mr-1 h-3 w-3" />
+                  Retirer
+                </Button>
+              ) : null}
+              {onRemove ? (
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => onRemove(bookmark)}
+                >
+                  <Trash2 className="mr-1 h-3 w-3" />
+                  Supprimer
+                </Button>
+              ) : null}
+            </div>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
 
-    const current = new Set(selected[key] as string[])
-    if (current.has(value)) {
-      current.delete(value)
-    } else {
-      current.add(value)
-    }
-    onChange({ ...selected, [key]: Array.from(current) })
+type ResultRowProps = {
+  material: RawMaterial
+  isActive: boolean
+  height: number
+  onClick: () => void
+}
+
+function ResultRow({ material, isActive, height, onClick }: ResultRowProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      role="option"
+      id={material.id}
+      aria-selected={isActive}
+      className={cn(
+        "flex w-full items-start gap-3 border-b border-border/60 px-4 py-3 text-left transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        isActive && "bg-muted"
+      )}
+      style={{ height }}
+    >
+      <div className="flex flex-1 flex-col gap-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-foreground">
+            {material.commercialName}
+          </span>
+          <Badge variant="outline" className="text-[10px] font-mono">
+            {material.site}
+          </Badge>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span>{material.inci}</span>
+          <span>· {material.supplier}</span>
+          <span>· {material.status}</span>
+          {material.casEcPairs.slice(0, 2).map((pair) => (
+            <Badge key={pair.id} variant="secondary" className="text-[10px]">
+              {pair.cas}
+            </Badge>
+          ))}
+        </div>
+      </div>
+      <ArrowUpRight className="mt-1 h-4 w-4 text-muted-foreground" />
+    </button>
+  )
+}
+
+type PreviewPaneProps = {
+  material: RawMaterial | null
+}
+
+function PreviewPane({ material }: PreviewPaneProps) {
+  if (!material) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-muted-foreground">
+        <Sparkles className="h-6 w-6" />
+        Sélectionnez une matière pour afficher un aperçu détaillé.
+      </div>
+    )
   }
 
+  const firstPairs = material.casEcPairs.slice(0, 3)
+  const truncated = material.casEcPairs.length - firstPairs.length
+
+  return (
+    <div className="flex h-full flex-col gap-4 px-4 py-4">
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">{material.commercialName}</h3>
+        <p className="text-xs text-muted-foreground">{material.inci}</p>
+      </div>
+      <div className="space-y-2 rounded-md border border-border bg-background px-3 py-3 text-xs">
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground">Fournisseur</span>
+          <span className="font-medium text-foreground">{material.supplier}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground">Site</span>
+          <span className="font-medium text-foreground">{material.site}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground">Statut</span>
+          <Badge variant="outline" className="text-[10px]">
+            {material.status}
+          </Badge>
+        </div>
+        {material.grade ? (
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Grade</span>
+            <span className="font-medium text-foreground">{material.grade}</span>
+          </div>
+        ) : null}
+      </div>
+      <div>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Identifiants CAS / EINECS
+        </span>
+        <div className="mt-2 space-y-1.5">
+          {firstPairs.map((pair) => (
+            <div key={pair.id} className="rounded border border-border px-2 py-1">
+              <div className="flex items-center justify-between text-xs font-medium">
+                <span>{pair.cas}</span>
+                {pair.ec ? <span className="text-muted-foreground">{pair.ec}</span> : null}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {pair.sources.map((source) => (
+                  <Badge key={source} variant="secondary" className="text-[10px]">
+                    {source}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          ))}
+          {truncated > 0 ? (
+            <span className="text-xs text-muted-foreground">+{truncated} identifiant(s)</span>
+          ) : null}
+        </div>
+      </div>
+      {material.risks?.length ? (
+        <div>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Risques
+          </span>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {material.risks.map((risk) => (
+              <Badge key={risk} variant="destructive" className="text-[10px]">
+                {risk}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+type FacetBarProps = {
+  facets: SelectedFacet
+  options: FacetOptions
+  onToggle: (field: keyof SelectedFacet, value: string) => void
+}
+
+type FacetOptions = {
+  status: string[]
+  site: string[]
+  supplier: string[]
+  origin: string[]
+  grade: string[]
+}
+
+function FacetBar({ facets, options, onToggle }: FacetBarProps) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
       <FacetGroup
-        label={FACET_LABELS.status}
-        values={STATUS_CHIPS}
-        selected={selected.status}
-        onToggle={(value) => toggle("status", value)}
+        label="Statut"
+        values={options.status}
+        selected={facets.status}
+        onToggle={(value) => onToggle("status", value)}
       />
       <FacetGroup
-        label={FACET_LABELS.site}
+        label="Site"
         values={options.site}
-        selected={selected.site}
-        onToggle={(value) => toggle("site", value)}
+        selected={facets.site}
+        onToggle={(value) => onToggle("site", value)}
       />
       <FacetGroup
-        label={FACET_LABELS.supplier}
+        label="Fournisseur"
         values={options.supplier}
-        selected={selected.supplier}
-        onToggle={(value) => toggle("supplier", value)}
+        selected={facets.supplier}
+        onToggle={(value) => onToggle("supplier", value)}
       />
       <FacetGroup
-        label={FACET_LABELS.origin}
+        label="Origine"
         values={options.origin}
-        selected={selected.origin}
-        onToggle={(value) => toggle("origin", value)}
+        selected={facets.origin}
+        onToggle={(value) => onToggle("origin", value)}
       />
       <FacetGroup
-        label={FACET_LABELS.grade}
+        label="Grade"
         values={options.grade}
-        selected={selected.grade}
-        onToggle={(value) => toggle("grade", value)}
+        selected={facets.grade}
+        onToggle={(value) => onToggle("grade", value)}
       />
       <Button
         size="xs"
-        variant={selected.favorite ? "default" : "outline"}
+        variant={facets.favorite ? "default" : "outline"}
         className="rounded-full px-3 text-[11px]"
-        onClick={() => toggle("favorite", "true")}
-        aria-pressed={selected.favorite}
+        onClick={() => onToggle("favorite", facets.favorite ? "false" : "true")}
+        aria-pressed={facets.favorite}
       >
         <Star className="mr-1.5 h-3 w-3" />
         Favoris
@@ -506,166 +932,67 @@ function FacetGroup({ label, values, selected, onToggle }: FacetGroupProps) {
   )
 }
 
-type FacetOptions = {
-  site: string[]
-  supplier: string[]
-  origin: string[]
-  grade: string[]
-}
+function buildFacetOptions(materials: RawMaterial[]): FacetOptions {
+  const status = new Set<string>()
+  const site = new Set<string>()
+  const supplier = new Set<string>()
+  const origin = new Set<string>()
+  const grade = new Set<string>()
 
-function buildFacetOptions(results: RawMaterial[], seed: RawMaterial[]): FacetOptions {
-  const source = results.length ? results : seed
-
-  const extract = (selector: (item: RawMaterial) => string | undefined) => {
-    const set = new Set<string>()
-    source.forEach((item) => {
-      const value = selector(item)
-      if (value) set.add(value)
-    })
-    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  for (const material of materials) {
+    status.add(material.status)
+    site.add(material.site)
+    supplier.add(material.supplier)
+    if (material.originCountry) origin.add(material.originCountry)
+    if (material.grade) grade.add(material.grade)
   }
+
+  const sort = (values: Set<string>) =>
+    Array.from(values.values()).sort((a, b) => a.localeCompare(b, "fr"))
 
   return {
-    site: extract((item) => item.site),
-    supplier: extract((item) => item.supplier),
-    origin: extract((item) => item.originCountry),
-    grade: extract((item) => item.grade),
+    status: sort(status),
+    site: sort(site),
+    supplier: sort(supplier),
+    origin: sort(origin),
+    grade: sort(grade),
   }
 }
 
-function facetsToParams(selected: SelectedFacets): Record<string, string | string[]> {
-  const params: Record<string, string | string[]> = {}
-
-  if (selected.status.length) params.status = selected.status
-  if (selected.site.length) params.site = selected.site
-  if (selected.supplier.length) params.supplier = selected.supplier
-  if (selected.origin.length) params.origin = selected.origin
-  if (selected.grade.length) params.grade = selected.grade
-  if (selected.favorite) params.favorite = "true"
-
-  return params
-}
-
-type PreviewCardProps = {
-  material: RawMaterial
-}
-
-function PreviewCard({ material }: PreviewCardProps) {
-  const firstPairs = material.casEcPairs.slice(0, 3)
-  const truncated = material.casEcPairs.length - firstPairs.length
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-foreground">{material.commercialName}</h3>
-          <Badge variant="outline" className="text-[10px] uppercase">
-            {material.status}
-          </Badge>
-        </div>
-        <p className="text-xs text-muted-foreground">{material.inci}</p>
-      </div>
-
-      <div className="space-y-2 rounded-md border border-border bg-muted/50 p-3 text-xs">
-        <div className="flex items-center justify-between">
-          <span className="text-muted-foreground">Fournisseur</span>
-          <span className="font-medium text-foreground">{material.supplier}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-muted-foreground">Site</span>
-          <span className="font-medium text-foreground">{material.site}</span>
-        </div>
-        {material.grade ? (
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Grade</span>
-            <span className="font-medium text-foreground">{material.grade}</span>
-          </div>
-        ) : null}
-        {material.originCountry ? (
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Origine</span>
-            <span className="font-medium text-foreground">{material.originCountry}</span>
-          </div>
-        ) : null}
-      </div>
-
-      <div>
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Identifiants CAS / EINECS
-        </span>
-        <div className="mt-2 space-y-1.5">
-          {firstPairs.map((pair) => (
-            <div key={pair.id} className="rounded border border-border px-2 py-1">
-              <div className="flex items-center justify-between text-xs font-medium">
-                <span>{pair.cas}</span>
-                {pair.ec ? <span className="text-muted-foreground">{pair.ec}</span> : null}
-              </div>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {pair.sources.map((source) => (
-                  <Badge key={source} variant="secondary" className="text-[10px]">
-                    {source}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          ))}
-          {truncated > 0 ? (
-            <span className="text-xs text-muted-foreground">+{truncated} identifiant(s)</span>
-          ) : null}
-        </div>
-      </div>
-
-      {material.risks?.length ? (
-        <div>
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Risques
-          </span>
-          <div className="mt-2 flex flex-wrap gap-1">
-            {material.risks.map((risk) => (
-              <Badge key={risk} variant="destructive" className="text-[10px]">
-                {risk}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {material.allergens?.length ? (
-        <div>
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Allergènes
-          </span>
-          <div className="mt-2 flex flex-wrap gap-1">
-            {material.allergens.map((allergen) => (
-              <Badge key={allergen} variant="outline" className="text-[10px]">
-                {allergen}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function onSelectFromHistory(
-  entry: RMHistoryEntry,
-  onSelect: RMCommandProps["onSelect"],
-  onOpenChange: (open: boolean) => void,
-  query: string
-) {
-  const material: RawMaterial = {
-    id: entry.id,
-    commercialName: entry.commercialName,
-    code: entry.code,
-    site: entry.site,
-    status: entry.status,
-    inci: entry.inci,
-    supplier: entry.supplier ?? "",
-    updatedAt: new Date().toISOString(),
-    casEcPairs: [],
+function mapFacetField(field: keyof SelectedFacet): string {
+  switch (field) {
+    case "status":
+      return "statut"
+    case "site":
+      return "site"
+    case "supplier":
+      return "fourn"
+    case "origin":
+      return "origine"
+    case "grade":
+      return "grade"
+    case "favorite":
+      return "favorite"
+    default:
+      return field
   }
+}
 
-  onSelect(material, { query })
-  onOpenChange(false)
+function quoteIfNeeded(value: string): string {
+  return /\s/.test(value) ? `"${value}"` : value
+}
+
+function serializeTokenStandalone(token: ParsedToken): string {
+  if (token.type === "field" && token.field) {
+    const prefix = token.negated ? "-" : ""
+    const needsQuotes = /\s/.test(token.value)
+    return `${prefix}${token.field}:${needsQuotes ? `"${token.value}"` : token.value}`
+  }
+  const prefix = token.negated ? "-" : ""
+  const needsQuotes = /\s/.test(token.value)
+  return `${prefix}${needsQuotes ? `"${token.value}"` : token.value}`
+}
+
+function ClockIcon() {
+  return <Clock className="h-3 w-3" aria-hidden="true" />
 }

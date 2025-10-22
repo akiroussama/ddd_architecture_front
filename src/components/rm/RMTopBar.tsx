@@ -1,488 +1,376 @@
 "use client"
 
 import * as React from "react"
-import { usePathname, useRouter } from "next/navigation"
 import {
   ChevronLeft,
   ChevronRight,
-  Clock,
+  GitCompare,
   History,
+  Menu,
+  List,
+  ListFilter,
   Search,
   Star,
 } from "lucide-react"
-import { toast } from "sonner"
 
-import { RMCommand, type RMCommandSavedView } from "@/components/rm/RMCommand"
-import type { RawMaterial, RMStatus } from "@/shared/types"
+import { RMRecentFavorites } from "@/components/rm/RMRecentFavorites"
+import type {
+  RawMaterial,
+  RawMaterialBookmark,
+  RawMaterialSavedView,
+} from "@/shared/types"
 import { Button } from "@/shared/ui/button"
 import { Badge } from "@/shared/ui/badge"
 import { Separator } from "@/shared/ui/separator"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/shared/ui/popover"
-import { ScrollArea } from "@/shared/ui/scroll-area"
-import { cn } from "@/shared/lib/utils"
-
-type HistoryEntry = {
-  id: string
-  commercialName: string
-  code: string
-  site: string
-  status: RMStatus
-  inci: string
-  supplier?: string
-}
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/shared/ui/tooltip"
+import { cn, formatRelativeDate } from "@/shared/lib/utils"
+import { analytics } from "@/lib/rm-store"
 
 type RMTopBarProps = {
-  current: RawMaterial
+  material: RawMaterial
   query: string
   order: string[]
-  initialItems?: RawMaterial[]
+  density: "comfortable" | "compact"
+  recents: RawMaterialBookmark[]
+  favorites: RawMaterialBookmark[]
+  views: RawMaterialSavedView[]
+  onNavigate: (id: string, options?: { query?: string; newTab?: boolean }) => void
+  onOpenCommand: () => void
+  onToggleFavorite: () => Promise<void> | void
+  onToggleFavoriteBookmark: (id: string) => void
+  onSelectBookmark: (id: string, source: "recent" | "favorite") => void
+  onRemoveRecent: (id: string) => void
+  onReorderFavorites: (ids: string[]) => void
+  onSaveView: (name: string) => void
+  onApplyView: (view: RawMaterialSavedView) => void
+  onDeleteView: (id: string) => void
+  onCompare: (targetId?: string) => void
+  onDensityChange: (value: "comfortable" | "compact") => void
 }
 
-const STORAGE_KEYS = {
-  recents: "gg:rm:recents",
-  favorites: "gg:rm:favorites",
-  views: "gg:rm:views",
-}
+export function RMTopBar({
+  material,
+  query,
+  order,
+  density,
+  recents,
+  favorites,
+  views,
+  onNavigate,
+  onOpenCommand,
+  onToggleFavorite,
+  onSelectBookmark,
+  onRemoveRecent,
+  onReorderFavorites,
+  onSaveView,
+  onApplyView,
+  onDeleteView,
+  onCompare,
+  onDensityChange,
+  onToggleFavoriteBookmark,
+}: RMTopBarProps) {
+  const prevId = React.useMemo(() => {
+    const index = order.indexOf(material.id)
+    return index > 0 ? order[index - 1] : undefined
+  }, [material.id, order])
 
-const DEFAULT_VIEWS: RMCommandSavedView[] = [
-  {
-    id: "view-approved-fr",
-    name: "Approuvées France",
-    query: 'statut:"Approuvé" site:FR',
-    description: "Matières approuvées sur sites FR",
-  },
-  {
-    id: "view-restricted-alert",
-    name: "Restreintes",
-    query: "statut:Restreint",
-    description: "Suivi des matières restreintes",
-  },
-  {
-    id: "view-favorites",
-    name: "Favoris",
-    query: "favoris:true",
-    description: "Sélection personnelle",
-  },
-]
+  const nextId = React.useMemo(() => {
+    const index = order.indexOf(material.id)
+    return index !== -1 && index < order.length - 1 ? order[index + 1] : undefined
+  }, [material.id, order])
 
-const RECENTS_LIMIT = 15
-const FAVORITES_LIMIT = 50
+  const handlePrev = () => {
+    if (!prevId) return
+    analytics("navigate_prev", { from: material.id, to: prevId })
+    onNavigate(prevId, { query })
+  }
 
-export function RMTopBar({ current, query, order, initialItems = [] }: RMTopBarProps) {
-  const router = useRouter()
-  const pathname = usePathname()
+  const handleNext = () => {
+    if (!nextId) return
+    analytics("navigate_next", { from: material.id, to: nextId })
+    onNavigate(nextId, { query })
+  }
 
-  const [isCommandOpen, setIsCommandOpen] = React.useState(false)
-  const [recents, setRecents] = React.useState<HistoryEntry[]>([])
-  const [favorites, setFavorites] = React.useState<HistoryEntry[]>([])
-  const [views, setViews] = React.useState<RMCommandSavedView[]>([])
-  const [isHydrated, setIsHydrated] = React.useState(false)
+  const handleSaveView = () => {
+    const defaultName = `${material.status} • ${material.site}`
+    const name = window.prompt("Nom de la vue à enregistrer :", defaultName)
+    if (!name) return
+    onSaveView(name)
+    analytics("save_view", { name, query })
+  }
 
-  const navigationOrder = React.useMemo(() => {
-    if (order.includes(current.id)) return order
-    return [current.id, ...order]
-  }, [current.id, order])
+  const handleApplyView = (view: RawMaterialSavedView) => {
+    onApplyView(view)
+    analytics("open_view", { id: view.id })
+  }
 
-  const currentIndex = navigationOrder.indexOf(current.id)
-  const prevId = currentIndex > 0 ? navigationOrder[currentIndex - 1] : undefined
-  const nextId =
-    currentIndex >= 0 && currentIndex < navigationOrder.length - 1
-      ? navigationOrder[currentIndex + 1]
-      : undefined
+  const handleToggleFavorite = () => {
+    onToggleFavorite()
+    analytics("toggle_favorite", { id: material.id, next: !material.favorite })
+  }
 
-  const isFavorite = favorites.some((item) => item.id === current.id)
+  const handleCompare = () => {
+    const fallback = nextId ?? prevId
+    onCompare(fallback)
+    analytics("compare_click", { id: material.id, with: fallback })
+  }
 
-  React.useEffect(() => {
-    const loadStorage = () => {
-      try {
-        const recentsRaw = localStorage.getItem(STORAGE_KEYS.recents)
-        const favoritesRaw = localStorage.getItem(STORAGE_KEYS.favorites)
-        const viewsRaw = localStorage.getItem(STORAGE_KEYS.views)
-
-        if (recentsRaw) {
-          setRecents(safelyParse<HistoryEntry[]>(recentsRaw))
-        }
-        if (favoritesRaw) {
-          setFavorites(safelyParse<HistoryEntry[]>(favoritesRaw))
-        }
-        if (viewsRaw) {
-          const parsed = safelyParse<RMCommandSavedView[]>(viewsRaw)
-          setViews(mergeDefaultViews(parsed))
-        } else {
-          setViews(DEFAULT_VIEWS)
-        }
-      } catch (error) {
-        console.error("Failed to parse RM storage", error)
-        setViews(DEFAULT_VIEWS)
-      } finally {
-        setIsHydrated(true)
-      }
-    }
-
-    loadStorage()
-  }, [])
-
-  React.useEffect(() => {
-    if (!isHydrated) return
-    const entry = materialToEntry(current)
-
-    setRecents((previous) => {
-      const updated = [entry, ...previous.filter((item) => item.id !== entry.id)].slice(
-        0,
-        RECENTS_LIMIT
-      )
-      localStorage.setItem(STORAGE_KEYS.recents, JSON.stringify(updated))
-      return updated
-    })
-  }, [current, isHydrated])
-
-  React.useEffect(() => {
-    if (!isHydrated || !current.favorite) return
-    const entry = materialToEntry(current)
-    setFavorites((previous) => {
-      if (previous.some((item) => item.id === entry.id)) return previous
-      const updated = [entry, ...previous].slice(0, FAVORITES_LIMIT)
-      localStorage.setItem(STORAGE_KEYS.favorites, JSON.stringify(updated))
-      return updated
-    })
-  }, [current, isHydrated])
-
-  React.useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (
-        event.target instanceof HTMLElement &&
-        ["INPUT", "TEXTAREA"].includes(event.target.tagName)
-      ) {
-        return
-      }
-
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault()
-        setIsCommandOpen((prev) => !prev)
-      }
-
-      if (event.key === "[" && prevId) {
-        event.preventDefault()
-        navigate(prevId, query)
-      }
-
-      if (event.key === "]" && nextId) {
-        event.preventDefault()
-        navigate(nextId, query)
-      }
-    }
-
-    window.addEventListener("keydown", handler)
-    return () => window.removeEventListener("keydown", handler)
-  })
-
-  const navigate = React.useCallback(
-    (id: string, q: string, options?: { newTab?: boolean }) => {
-      const search = q ? `?q=${encodeURIComponent(q)}` : ""
-      const href = `/raw-materials/${id}${search}`
-
-      if (options?.newTab) {
-        window.open(href, "_blank", "noopener,noreferrer")
-        return
-      }
-
-      if (pathname === `/raw-materials/${id}` && q === query) {
-        router.replace(href)
-      } else {
-        router.push(href)
-      }
-    },
-    [pathname, query, router]
-  )
-
-  const toggleFavorite = React.useCallback(() => {
-    const entry = materialToEntry(current)
-    setFavorites((previous) => {
-      const exists = previous.some((item) => item.id === entry.id)
-      const updated = exists
-        ? previous.filter((item) => item.id !== entry.id)
-        : [entry, ...previous].slice(0, FAVORITES_LIMIT)
-      localStorage.setItem(STORAGE_KEYS.favorites, JSON.stringify(updated))
-      toast.success(
-        exists ? "Retiré des favoris" : `${current.commercialName} ajouté aux favoris`
-      )
-      return updated
-    })
-  }, [current])
-
-  const runSearch = React.useCallback(
-    async (
-      searchQuery: string,
-      facets?: URLSearchParams | Record<string, string | string[] | undefined>
-    ) => {
-      const params =
-        facets instanceof URLSearchParams ? new URLSearchParams(facets) : new URLSearchParams()
-
-      if (!(facets instanceof URLSearchParams) && facets) {
-        Object.entries(facets).forEach(([key, value]) => {
-          if (!value) return
-          if (Array.isArray(value)) {
-            value.forEach((item) => params.append(key, item))
-          } else {
-            params.append(key, value)
-          }
-        })
-      }
-
-      params.set("q", searchQuery)
-      const response = await fetch(`/api/raw-materials/search?${params.toString()}`)
-      if (!response.ok) {
-        throw new Error("Impossible d'exécuter la recherche")
-      }
-      return (await response.json()) as {
-        items: RawMaterial[]
-        order: string[]
-        total: number
-        query: string
-      }
-    },
-    []
-  )
-
-  const handleApplyView = React.useCallback(
-    async (view: RMCommandSavedView) => {
-      try {
-        const result = await runSearch(view.query)
-        if (!result.items.length) {
-          toast.info("Aucun résultat pour cette vue sauvegardée")
-          return
-        }
-        navigate(result.items[0].id, view.query)
-      } catch (error) {
-        console.error(error)
-        toast.error("Impossible d'appliquer la vue")
-      }
-    },
-    [navigate, runSearch]
-  )
-
-  const handleSaveView = React.useCallback(
-    (view: RMCommandSavedView) => {
-      setViews((previous) => {
-        const next = mergeDefaultViews([view, ...previous.filter((v) => v.id !== view.id)])
-        localStorage.setItem(STORAGE_KEYS.views, JSON.stringify(next))
-        toast.success(`Vue "${view.name}" enregistrée`)
-        return next
-      })
-    },
-    []
-  )
+  const handleDensityToggle = () => {
+    const next = density === "comfortable" ? "compact" : "comfortable"
+    onDensityChange(next)
+    analytics("toggle_density", { density: next })
+  }
 
   return (
-    <>
-      <div className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-[60px] max-w-7xl items-center gap-3 px-4 sm:px-6">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Matière précédente"
-              disabled={!prevId}
-              onClick={() => prevId && navigate(prevId, query)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Matière suivante"
-              disabled={!nextId}
-              onClick={() => nextId && navigate(nextId, query)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+    <div className="border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="mx-auto flex h-[60px] max-w-7xl items-center gap-3 px-4 sm:px-6">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Matière précédente"
+            disabled={!prevId}
+            onClick={handlePrev}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Matière suivante"
+            disabled={!nextId}
+            onClick={handleNext}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
 
-          <div className="flex min-w-0 flex-1 items-center gap-3 rounded-md border border-border bg-muted/50 px-3 py-2">
-            <div className="flex flex-1 items-center gap-3">
-              <Badge variant="outline" className="shrink-0 text-xs uppercase">
-                {current.status}
-              </Badge>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="truncate text-sm font-semibold text-foreground">
-                    {current.commercialName}
-                  </p>
-                  <Badge variant="secondary" className="font-normal">
-                    {current.site}
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 border border-primary/30 bg-primary/10 text-xs font-semibold uppercase tracking-wide text-primary"
+                  >
+                    {material.status}
                   </Badge>
-                </div>
-                <p className="truncate text-xs text-muted-foreground">{current.inci}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant={isFavorite ? "default" : "ghost"}
-                size="icon"
-                aria-pressed={isFavorite}
-                aria-label={
-                  isFavorite
-                    ? "Retirer des favoris"
-                    : "Ajouter aux favoris (disponible dans le menu favoris)"
-                }
-                onClick={toggleFavorite}
-              >
-                <Star className={cn("h-4 w-4", isFavorite && "fill-current")} />
-              </Button>
-              <Separator orientation="vertical" className="h-6" />
-              <Button
-                variant="outline"
-                size="sm"
-                className="hidden sm:inline-flex"
-                onClick={() => setIsCommandOpen(true)}
-              >
-                <Search className="mr-2 h-4 w-4" />
-                <span>Rechercher</span>
-                <kbd className="ml-2 hidden rounded bg-muted px-1 py-[2px] text-[10px] font-medium text-muted-foreground md:inline-block">
-                  ⌘K
-                </kbd>
-              </Button>
-            </div>
+                </TooltipTrigger>
+                <TooltipContent>Statut de la matière première</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="truncate text-sm font-semibold text-foreground sm:text-base">
+                    {material.commercialName}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{material.commercialName}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <Separator orientation="vertical" className="hidden h-4 sm:block" />
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="hidden truncate text-xs text-muted-foreground sm:inline-flex">
+                    {material.inci}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{material.inci}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
-
-          <div className="hidden items-center gap-2 md:flex">
-            {views.slice(0, 3).map((view) => (
-              <Button
-                key={view.id}
-                variant="ghost"
-                size="sm"
-                className="rounded-full bg-transparent text-xs"
-                onClick={() => handleApplyView(view)}
-              >
-                {view.name}
-              </Button>
-            ))}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <History className="h-4 w-4" />
-                  Récents
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-72 p-0">
-                <div className="border-b border-border px-3 py-2 text-xs font-semibold text-muted-foreground">
-                  Dernières matières & favoris
-                </div>
-                <ScrollArea className="h-64">
-                  <div className="px-3 py-2">
-                    <SectionList
-                      title="Récents"
-                      items={recents.slice(0, 5)}
-                      onSelect={(item) => navigate(item.id, query)}
-                    />
-                    <SectionList
-                      title="Favoris"
-                      emptyHint="Ajoutez des favoris pour y accéder rapidement."
-                      items={favorites.slice(0, 8)}
-                      onSelect={(item) => navigate(item.id, query)}
-                    />
-                  </div>
-                </ScrollArea>
-              </PopoverContent>
-            </Popover>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground sm:text-xs">
+            <span className="truncate">
+              <strong>Site</strong> {material.site}
+            </span>
+            <span className="hidden truncate sm:inline">
+              <strong>Fournisseur</strong> {material.supplier}
+            </span>
+            <span className="truncate">
+              <strong>Mis à jour</strong> {formatRelativeDate(material.updatedAt)}
+            </span>
+            {material.grade ? (
+              <span className="hidden truncate md:inline">
+                <strong>Grade</strong> {material.grade}
+              </span>
+            ) : null}
           </div>
         </div>
-      </div>
 
-      <RMCommand
-        open={isCommandOpen}
-        onOpenChange={setIsCommandOpen}
-        query={query}
-        initialItems={initialItems}
-        onSelect={(item, options) => navigate(item.id, options?.query ?? query, options)}
-        savedViews={views}
-        onApplyView={handleApplyView}
-        onSaveView={handleSaveView}
-        favorites={favorites}
-        recents={recents}
-        runSearch={runSearch}
-      />
-    </>
-  )
-}
+        <div className="hidden items-center gap-2 md:flex">
+          <Button
+            variant={material.favorite ? "default" : "ghost"}
+            size="icon"
+            aria-label={material.favorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+            onClick={handleToggleFavorite}
+          >
+            <Star className={cn("h-4 w-4", material.favorite && "fill-current")} />
+          </Button>
 
-type SectionListProps = {
-  title: string
-  items: HistoryEntry[]
-  onSelect: (item: HistoryEntry) => void
-  emptyHint?: string
-}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              analytics("open_palette", { query })
+              onOpenCommand()
+            }}
+            aria-haspopup="dialog"
+            className="hidden items-center gap-2 sm:inline-flex"
+          >
+            <Search className="h-4 w-4" />
+            <span>Rechercher</span>
+            <kbd className="hidden rounded bg-muted px-1 py-[2px] text-[10px] font-medium text-muted-foreground md:inline">
+              ⌘K
+            </kbd>
+          </Button>
 
-function SectionList({ title, items, onSelect, emptyHint }: SectionListProps) {
-  return (
-    <div className="mb-4">
-      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {title}
-      </div>
-      {items.length ? (
-        <ul className="space-y-1">
-          {items.map((item) => (
-            <li key={item.id}>
-              <button
-                type="button"
-                onClick={() => onSelect(item)}
-                className="w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-2">
+                <History className="h-4 w-4" />
+                Historique
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="p-0 shadow-lg">
+              <RMRecentFavorites
+                recents={recents}
+                favorites={favorites}
+                onSelect={onSelectBookmark}
+                onToggleFavorite={(id) => {
+                  onToggleFavoriteBookmark(id)
+                  analytics("toggle_favorite_shortcut", { id })
+                }}
+                onRemoveRecent={onRemoveRecent}
+                onReorderFavorites={onReorderFavorites}
+              />
+            </PopoverContent>
+          </Popover>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-2">
+                <Menu className="h-4 w-4" />
+                Vues
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuLabel>Vues sauvegardées</DropdownMenuLabel>
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault()
+                  handleSaveView()
+                }}
               >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-foreground">{item.commercialName}</span>
-                  <Badge variant="outline" className="text-[10px]">
-                    {item.site}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{item.inci}</span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {item.status}
-                  </span>
-                </div>
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : emptyHint ? (
-        <p className="text-xs text-muted-foreground">{emptyHint}</p>
-      ) : null}
+                Sauvegarder la requête actuelle…
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {views.length === 0 ? (
+                <DropdownMenuItem disabled>Aucune vue enregistrée</DropdownMenuItem>
+              ) : (
+                views.map((view) => (
+                  <DropdownMenuSub key={view.id}>
+                    <DropdownMenuSubTrigger>
+                      <span className="truncate font-medium">{view.name}</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault()
+                          handleApplyView(view)
+                        }}
+                      >
+                        Appliquer
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={(event) => {
+                          event.preventDefault()
+                          onDeleteView(view.id)
+                          analytics("delete_view", { id: view.id })
+                        }}
+                      >
+                        Supprimer
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                ))
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button variant="ghost" size="sm" className="gap-2" onClick={handleCompare}>
+            <GitCompare className="h-4 w-4" />
+            Comparer
+          </Button>
+
+          <TooltipProvider delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Changer la densité d’affichage"
+                  onClick={handleDensityToggle}
+                >
+                  {density === "comfortable" ? (
+                    <List className="h-4 w-4" />
+                  ) : (
+                    <ListFilter className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                Basculer en mode {density === "comfortable" ? "compact" : "confort"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+
+        <div className="flex items-center gap-2 md:hidden">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Rechercher"
+            onClick={() => {
+              analytics("open_palette_mobile", { query })
+              onOpenCommand()
+            }}
+          >
+            <Search className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={material.favorite ? "default" : "ghost"}
+            size="icon"
+            aria-label={material.favorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+            onClick={handleToggleFavorite}
+          >
+            <Star className={cn("h-4 w-4", material.favorite && "fill-current")} />
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
-
-function materialToEntry(material: RawMaterial): HistoryEntry {
-  return {
-    id: material.id,
-    commercialName: material.commercialName,
-    code: material.code,
-    site: material.site,
-    status: material.status,
-    inci: material.inci,
-    supplier: material.supplier,
-  }
-}
-
-function safelyParse<T>(value: string): T {
-  try {
-    return JSON.parse(value) as T
-  } catch {
-    return [] as unknown as T
-  }
-}
-
-function mergeDefaultViews(views: RMCommandSavedView[]): RMCommandSavedView[] {
-  const map = new Map<string, RMCommandSavedView>()
-  DEFAULT_VIEWS.forEach((view) => map.set(view.id, view))
-  views.forEach((view) => map.set(view.id, view))
-  return Array.from(map.values())
-}
-
-export type RMHistoryEntry = HistoryEntry

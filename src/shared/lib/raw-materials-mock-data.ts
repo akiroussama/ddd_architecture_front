@@ -309,7 +309,7 @@ function randomStatus(): RMStatus {
     if (random <= 0) return statuses[i]
   }
 
-  return "active"
+  return "Actif"
 }
 
 function randomDate(daysBack: number): string {

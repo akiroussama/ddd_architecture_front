@@ -258,6 +258,8 @@ export type RawMaterial = {
   lastViewedAt?: string
   documents?: Document[]
   notes?: RegulatoryNote[]
+  allergenStatements?: string[]
+  hazards?: string[]
 }
 
 export interface RawMaterialFilters {
@@ -267,4 +269,24 @@ export interface RawMaterialFilters {
   supplier: string | null
   inci: string | null
   favoriteOnly?: boolean
+}
+
+export type RawMaterialBookmark = {
+  id: string
+  commercialName: string
+  code: string
+  inci: string
+  supplier: string
+  site: string
+  status: RMStatus
+  updatedAt: string
+  timestamp: string
+}
+
+export type RawMaterialSavedView = {
+  id: string
+  name: string
+  query: string
+  createdAt: string
+  color?: string
 }

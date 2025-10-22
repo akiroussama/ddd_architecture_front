@@ -31,6 +31,10 @@ export const EcSchema = z
   .string()
   .regex(EC_REGEX, "Format EINECS/EC invalide (ex: 233-466-0)")
 
+export function isValidEc(ec: string): boolean {
+  return EC_REGEX.test(ec)
+}
+
 export const CasEcPairSchema = z.object({
   id: z.string().uuid(),
   cas: CasSchema,
