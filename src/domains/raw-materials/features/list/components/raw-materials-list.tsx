@@ -478,12 +478,35 @@ export function RawMaterialsList() {
             )}
 
             {/* Active filter badges */}
-            {filters.siteId && (
+            {filters.site && (
               <Badge variant="outline" className="gap-1.5">
-                Site:{" "}
-                {mockSites.find((s) => s.id === filters.siteId)?.code}
+                Site: {filters.site}
                 <button
-                  onClick={() => setFilters((prev) => ({ ...prev, siteId: null }))}
+                  onClick={() => setFilters((prev) => ({ ...prev, site: null }))}
+                  className="ml-1"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+
+            {filters.supplier && (
+              <Badge variant="outline" className="gap-1.5">
+                Fournisseur: {filters.supplier}
+                <button
+                  onClick={() => setFilters((prev) => ({ ...prev, supplier: null }))}
+                  className="ml-1"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+
+            {filters.inci && (
+              <Badge variant="outline" className="gap-1.5">
+                INCI: {filters.inci}
+                <button
+                  onClick={() => setFilters((prev) => ({ ...prev, inci: null }))}
                   className="ml-1"
                 >
                   <X className="h-3 w-3" />
@@ -493,9 +516,21 @@ export function RawMaterialsList() {
 
             {filters.status !== "all" && (
               <Badge variant="outline" className="gap-1.5">
-                Statut: {statusConfig[filters.status as RawMaterialStatus].label}
+                Statut: {statusConfig[filters.status as RMStatus].label}
                 <button
                   onClick={() => setFilters((prev) => ({ ...prev, status: "all" }))}
+                  className="ml-1"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+
+            {filters.favoriteOnly && (
+              <Badge variant="outline" className="gap-1.5">
+                Favoris seulement
+                <button
+                  onClick={() => setFilters((prev) => ({ ...prev, favoriteOnly: false }))}
                   className="ml-1"
                 >
                   <X className="h-3 w-3" />
