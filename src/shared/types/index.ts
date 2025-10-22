@@ -143,8 +143,8 @@ export interface InciEntry {
   name: string
   annexReference?: string
   usMonograph?: string
-  euInventorySource: string
-  usInventorySource: string
+  euInventorySource?: string
+  usInventorySource?: string
   comment?: string
   synonyms?: string[]
   createdAt: string

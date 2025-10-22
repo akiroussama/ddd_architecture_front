@@ -17,9 +17,11 @@ export async function generateMetadata({
     }
   }
 
+  const inventoryFragment = entry.euInventorySource ? ` - ${entry.euInventorySource}` : ""
+
   return {
     title: `${entry.name} | Référentiel INCI | GeberGuard PLM`,
-    description: `Détails de l'entrée INCI ${entry.name} - ${entry.euInventorySource}`,
+    description: `Détails de l'entrée INCI ${entry.name}${inventoryFragment}`,
   }
 }
 
